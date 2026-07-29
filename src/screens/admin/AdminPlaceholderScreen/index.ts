@@ -1,0 +1,1 @@
+export { AdminPlaceholderScreen } from './AdminPlaceholderScreen';

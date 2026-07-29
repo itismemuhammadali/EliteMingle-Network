@@ -1,0 +1,1 @@
+export { AdminMainScreen } from './AdminMainScreen';

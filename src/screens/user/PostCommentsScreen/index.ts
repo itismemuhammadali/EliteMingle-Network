@@ -1,0 +1,1 @@
+export { PostCommentsScreen } from './PostCommentsScreen';
