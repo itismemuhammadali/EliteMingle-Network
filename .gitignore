@@ -23,3 +23,6 @@ emulator-data/
 .DS_Store
 *.pem
 .watchmanconfig.local
+
+# firebase emulator export dumps
+firebase-export-*/
