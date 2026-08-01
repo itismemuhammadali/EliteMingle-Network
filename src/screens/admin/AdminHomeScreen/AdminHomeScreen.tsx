@@ -55,6 +55,9 @@ export function AdminHomeScreen({
             comments: p.comments,
             shares: p.shares,
             avatarColor: p.avatarColor || '#800080',
+            imageUrl: p.imageUrl,
+            videoUrl: p.videoUrl,
+            mediaType: p.mediaType,
           })),
       );
     });

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import Video from 'react-native-video';
 import {
   HeartIcon,
   CommentIcon,
@@ -24,6 +25,9 @@ export interface NewsPost {
   shares: number;
   hasWarning?: boolean;
   avatarColor: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  mediaType?: string;
 }
 
 interface NewsPostCardProps {
@@ -67,7 +71,24 @@ export function NewsPostCard({
           </Text>
         </View>
       </View>
-      <Text style={styles.content}>{post.content}</Text>
+      {post.content ? (
+        <Text style={styles.content}>{post.content}</Text>
+      ) : null}
+      {post.mediaType === 'video' && post.videoUrl ? (
+        <Video
+          source={{ uri: post.videoUrl }}
+          style={styles.postMedia}
+          resizeMode="cover"
+          controls
+          paused
+        />
+      ) : post.imageUrl ? (
+        <Image
+          source={{ uri: post.imageUrl }}
+          style={styles.postMedia}
+          resizeMode="cover"
+        />
+      ) : null}
       <View style={styles.engagementRow}>
         <View style={styles.engagementItem}>
           <HeartIcon size={UtilityMethods.wp(4.5)} color="#F44336" />
@@ -192,6 +213,13 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     lineHeight: FontSize.VALUE(20),
     marginBottom: UtilityMethods.hp(1.5),
+  },
+  postMedia: {
+    width: '100%',
+    height: UtilityMethods.hp(20),
+    borderRadius: UtilityMethods.wp(2),
+    marginBottom: UtilityMethods.hp(1.5),
+    backgroundColor: '#EFEFEF',
   },
   engagementRow: {
     flexDirection: 'row',
