@@ -114,7 +114,7 @@ export function AdminUsersScreen({
         isScrollable={true}
         includeSafeArea={false}
         barStyle="dark-content"
-        statusbarBackgrund="#FFFFFF"
+        statusbarBackgrund={Colors.adminBackgroundGrey}
         bottomColor={Colors.adminBackgroundGrey}
         contentContainerStyle={styles.content}
       >

@@ -25,6 +25,8 @@ import {
   HelpIcon,
   LogoutIcon,
 } from '../../../components/admin/icons';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { uploadAvatar } from '../../../services/postService';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
@@ -119,13 +121,63 @@ export function AdminSettingsScreen({
     }
   };
 
+  // Upload a newly-picked avatar to Storage and persist it.
+  const applyAvatar = async (uri?: string) => {
+    const uid = currentUser?.uid;
+    if (!uri || !uid) return;
+    try {
+      const uploaded = await uploadAvatar(uid, uri);
+      const finalUri = uploaded && uploaded.startsWith('http') ? uploaded : uri;
+      setAvatarUri(finalUri);
+      await firestore()
+        .collection('users')
+        .doc(uid)
+        .set({ avatarUri: uploaded }, { merge: true });
+    } catch (err) {
+      console.error('Avatar update failed:', err);
+      Alert.alert('Error', 'Could not update the picture.');
+    }
+  };
+
+  const pickFromGallery = () => {
+    launchImageLibrary(
+      { mediaType: 'photo', selectionLimit: 1, includeExtra: true },
+      res => {
+        if (res.didCancel || res.errorCode) return;
+        applyAvatar(res.assets?.[0]?.uri);
+      },
+    );
+  };
+
+  const takePhoto = () => {
+    launchCamera(
+      { mediaType: 'photo', saveToPhotos: false, includeExtra: true },
+      res => {
+        if (res.didCancel) return;
+        if (res.errorCode) {
+          Alert.alert('Camera', res.errorMessage || 'Could not open the camera.');
+          return;
+        }
+        applyAvatar(res.assets?.[0]?.uri);
+      },
+    );
+  };
+
+  const handlePickAvatar = () => {
+    Alert.alert('Profile Picture', 'Choose a source', [
+      { text: 'Take Photo', onPress: takePhoto },
+      { text: 'Choose from Gallery', onPress: pickFromGallery },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
 
   return (
     <MainLayout
       isScrollable={false}
       includeSafeArea={false}
       barStyle="dark-content"
-      statusbarBackgrund="#FFFFFF"
+      statusbarBackgrund={Colors.adminBackgroundGrey}
       bottomColor={Colors.adminBackgroundGrey}
     >
       <View style={{ paddingTop: UtilityMethods.hp(0.6) }}>
@@ -152,7 +204,7 @@ export function AdminSettingsScreen({
             />
             <TouchableOpacity
               style={styles.cameraButton}
-              onPress={() => {}}
+              onPress={handlePickAvatar}
               activeOpacity={0.7}
             >
               <CameraIcon size={UtilityMethods.wp(4)} color={Colors.white} />
