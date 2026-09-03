@@ -1,9 +1,9 @@
 import { firebase } from '@react-native-firebase/app';
 import firestore from '@react-native-firebase/firestore';
 
-// Host/port must match src/config/firebase.ts (the emulator the app talks to).
-const EMULATOR_HOST = '127.0.0.1';
-const AUTH_PORT = 9099;
+// Google Identity Toolkit REST endpoint for the real Firebase project.
+const IDENTITY_TOOLKIT_BASE =
+  'https://identitytoolkit.googleapis.com/v1';
 
 export interface CreateUserAccountParams {
   name: string;
@@ -43,24 +43,16 @@ const mapRestError = (message: string): AccountError => {
 
 /**
  * Creates a real Firebase Auth account + Firestore profile for a new user and
- * returns the new uid. The auth account is created via the Auth EMULATOR's REST
- * API, so it never replaces the admin's own signed-in session (the client SDK
- * would otherwise sign you in as the new user). Dev/emulator only — production
- * account creation needs the Admin SDK / a Cloud Function.
+ * returns the new uid. The auth account is created via the Identity Toolkit
+ * REST API (real Firebase), so it never replaces the admin's own signed-in
+ * session (the client SDK would otherwise sign you in as the new user).
  */
 export const createUserAccount = async (
   params: CreateUserAccountParams,
 ): Promise<string> => {
-  if (!__DEV__) {
-    throw new AccountError(
-      'auth/unsupported',
-      'Creating accounts in production requires a Cloud Function.',
-    );
-  }
-
   const { name, email, phone, role, password, avatarUri, avatarColor } = params;
   const apiKey = (firebase.app().options as { apiKey?: string }).apiKey || 'dev';
-  const base = `http://${EMULATOR_HOST}:${AUTH_PORT}/identitytoolkit.googleapis.com/v1`;
+  const base = IDENTITY_TOOLKIT_BASE;
 
   // 1. Create the auth account (pure HTTP → admin session untouched).
   const res = await fetch(`${base}/accounts:signUp?key=${apiKey}`, {

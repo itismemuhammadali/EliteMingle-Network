@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "1234567890",
-    "project_id": "najiyashade-dev",
-    "storage_bucket": "najiyashade-dev.appspot.com"
+    "project_number": "909617000261",
+    "project_id": "exceptionalpeoplemingle",
+    "storage_bucket": "exceptionalpeoplemingle.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1234567890:android:abcdef1234567890",
+        "mobilesdk_app_id": "1:909617000261:android:cacb18aa1305196545982c",
+        "android_client_info": {
+          "package_name": "com.exceptionalpeoplemingle.epm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909617000261:android:df19d425c0c67f6845982c",
         "android_client_info": {
           "package_name": "com.najiyashade"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDummyKeyForLocalEmulators12345"
+          "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
         }
       ],
       "services": {

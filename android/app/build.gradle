@@ -81,7 +81,7 @@ android {
 
     namespace "com.najiyashade"
     defaultConfig {
-        applicationId "com.najiyashade"
+        applicationId "com.exceptionalpeoplemingle.epm"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

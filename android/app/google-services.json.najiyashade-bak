@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "909617000261",
+    "project_id": "exceptionalpeoplemingle",
+    "storage_bucket": "exceptionalpeoplemingle.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909617000261:android:df19d425c0c67f6845982c",
+        "android_client_info": {
+          "package_name": "com.najiyashade"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
