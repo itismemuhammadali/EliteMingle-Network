@@ -87,7 +87,44 @@ service cloud.firestore {
       }
     }
 
-    // ── Everything else (conversations, messages, notifications, reports):
+    // ── Conversations & Messages ────────────────────────────────
+    match /conversations/{conversationId} {
+      allow read, write: if isAuthenticated();
+
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      match /{sub=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // ── Notifications ───────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.recipientId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── Reports (Content & User Moderation) ─────────────────────
+    match /reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Help & Support Tickets ──────────────────────────────────
+    match /support_tickets/{ticketId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Everything else (safe authenticated fallback) ───────────
     match /{document=**} {
       allow read, write: if isAuthenticated();
     }

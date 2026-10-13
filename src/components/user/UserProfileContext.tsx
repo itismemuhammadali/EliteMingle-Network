@@ -50,6 +50,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
         ...prev,
         displayName: firebaseUser.displayName || prev.displayName || 'User',
         email: firebaseUser.email || prev.email || '',
+        avatarUri: firebaseUser.photoURL || prev.avatarUri || null,
       }));
 
       // Realtime listener for Firestore users collection document
@@ -90,7 +91,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                   bio: data.bio !== undefined ? data.bio : prev.bio,
                   phone: data.phone !== undefined ? data.phone : prev.phone,
                   location: data.location !== undefined ? data.location : prev.location,
-                  avatarUri: data.avatarUri !== undefined ? data.avatarUri : prev.avatarUri,
+                  avatarUri: data.avatarUri || data.profilePicture || firebaseUser.photoURL || prev.avatarUri || null,
                   coverUri: data.coverUri !== undefined ? data.coverUri : prev.coverUri,
                   voiceCommandsEnabled: voiceVal,
                   ttsEnabled: ttsVal,

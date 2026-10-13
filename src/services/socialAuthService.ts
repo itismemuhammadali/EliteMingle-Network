@@ -51,6 +51,7 @@ export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.UserCredenti
       const uid = userCredential.user.uid;
       const email = userCredential.user.email || '';
       const fullName = userCredential.user.displayName || 'Google User';
+      const photoURL = userCredential.user.photoURL || '';
 
       const userDoc = await firestore().collection('users').doc(uid).get();
       if (!userDoc.exists) {
@@ -58,19 +59,26 @@ export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.UserCredenti
           uid,
           email,
           fullName,
+          avatarUri: photoURL,
+          profilePicture: photoURL,
           role: 'User',
           profileCompleted: false,
           createdAt: firestore.FieldValue.serverTimestamp(),
           updatedAt: firestore.FieldValue.serverTimestamp(),
         });
       } else {
+        const updatePayload: Record<string, any> = {
+          uid,
+          email,
+          fullName,
+          updatedAt: firestore.FieldValue.serverTimestamp(),
+        };
+        if (photoURL && !userDoc.data()?.avatarUri) {
+          updatePayload.avatarUri = photoURL;
+          updatePayload.profilePicture = photoURL;
+        }
         await firestore().collection('users').doc(uid).set(
-          {
-            uid,
-            email,
-            fullName,
-            updatedAt: firestore.FieldValue.serverTimestamp(),
-          },
+          updatePayload,
           { merge: true },
         );
       }
@@ -128,11 +136,14 @@ export const signInWithApple = async (): Promise<FirebaseAuthTypes.UserCredentia
       }
 
       const userDoc = await firestore().collection('users').doc(uid).get();
+      const photoURL = userCredential.user.photoURL || '';
       if (!userDoc.exists) {
         await firestore().collection('users').doc(uid).set({
           uid,
           email,
           fullName: finalName,
+          avatarUri: photoURL,
+          profilePicture: photoURL,
           role: 'User',
           profileCompleted: false,
           createdAt: firestore.FieldValue.serverTimestamp(),

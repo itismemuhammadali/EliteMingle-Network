@@ -29,6 +29,18 @@ service firebase.storage {
       allow read: if true;
       allow write: if request.auth != null;
     }
+
+    // Chat media & voice memos: chat/{conversationId}/{fileName}
+    match /chat/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // General fallback for all authenticated uploads
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }
 

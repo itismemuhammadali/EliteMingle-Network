@@ -98,16 +98,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               ? existingName
               : fallbackName;
 
+          const updateObj: Record<string, any> = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            fullName: resolvedName,
+            updatedAt: firestore.FieldValue.serverTimestamp(),
+          };
+          if (firebaseUser.photoURL && !existingData?.avatarUri && !existingData?.profilePicture) {
+            updateObj.avatarUri = firebaseUser.photoURL;
+            updateObj.profilePicture = firebaseUser.photoURL;
+          }
+
           await firestore()
             .collection('users')
             .doc(firebaseUser.uid)
             .set(
-              {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || '',
-                fullName: resolvedName,
-                updatedAt: firestore.FieldValue.serverTimestamp(),
-              },
+              updateObj,
               { merge: true },
             );
         } else {

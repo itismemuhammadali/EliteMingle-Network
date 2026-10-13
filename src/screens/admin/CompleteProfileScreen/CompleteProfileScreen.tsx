@@ -8,6 +8,7 @@ import {
   Switch,
   Image,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../../navigation/Admin/types';
@@ -41,6 +42,7 @@ export function CompleteProfileScreen() {
   const { user, setIsProfileCompleted } = useAuth();
 
   const [name, setName] = useState(user?.displayName || '');
+  const [avatarUri, setAvatarUri] = useState<string | null>(user?.photoURL || null);
   const [bio, setBio] = useState('');
   const [voiceCommands, setVoiceCommands] = useState(false);
   const [textToSpeech, setTextToSpeech] = useState(false);
@@ -52,6 +54,9 @@ export function CompleteProfileScreen() {
     if (user?.uid) {
       if (!name && user.displayName) {
         setName(user.displayName);
+      }
+      if (!avatarUri && user.photoURL) {
+        setAvatarUri(user.photoURL);
       }
       // Attempt to load existing user doc if any
       firestore()
@@ -65,6 +70,10 @@ export function CompleteProfileScreen() {
               setName(data.fullName);
             }
             if (data?.bio) setBio(data.bio);
+            const fetchedAvatar = data?.avatarUri || data?.profilePicture;
+            if (fetchedAvatar) {
+              setAvatarUri(fetchedAvatar);
+            }
           }
         })
         .catch(() => {});
@@ -79,6 +88,17 @@ export function CompleteProfileScreen() {
     );
   };
 
+  const handlePickPhoto = () => {
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
+      if (response.assets && response.assets.length > 0) {
+        const uri = response.assets[0].uri;
+        if (uri) {
+          setAvatarUri(uri);
+        }
+      }
+    });
+  };
+
   const handleCompleteSetup = async () => {
     setIsSubmitting(true);
     try {
@@ -89,6 +109,8 @@ export function CompleteProfileScreen() {
             uid: user.uid,
             fullName: name,
             displayName: name,
+            avatarUri: avatarUri || '',
+            profilePicture: avatarUri || '',
             bio: bio,
             voiceCommands: voiceCommands,
             textToSpeech: textToSpeech,
@@ -144,15 +166,21 @@ export function CompleteProfileScreen() {
 
         <Card style={styles.card}>
           <View style={styles.photoSection}>
-            <TouchableOpacity style={styles.photoContainer}>
-              <View style={styles.photoPlaceholder}>
-                <PersonIcon width={60} height={60} />
-              </View>
+            <TouchableOpacity style={styles.photoContainer} onPress={handlePickPhoto}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.photoAvatar} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <PersonIcon width={60} height={60} />
+                </View>
+              )}
               <View style={styles.cameraIcon}>
                 <CameraIcon />
               </View>
             </TouchableOpacity>
-            <Text style={styles.uploadText}>Upload profile photo</Text>
+            <Text style={styles.uploadText}>
+              {avatarUri ? 'Change profile photo' : 'Upload profile photo'}
+            </Text>
           </View>
 
           <View style={styles.fieldContainer}>
@@ -306,6 +334,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderGrey,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  photoAvatar: {
+    width: UtilityMethods.wp(25),
+    height: UtilityMethods.wp(25),
+    borderRadius: UtilityMethods.wp(12.5),
   },
   cameraIcon: {
     position: 'absolute',
