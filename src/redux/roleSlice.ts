@@ -7,6 +7,12 @@ export type RoleState = {
   simplifiedUi: boolean;
   /** User font-size preference: added to every FontSize.VALUE (points). */
   fontScale: number;
+  /** Read content aloud */
+  ttsEnabled: boolean;
+  /** Voice commands navigation control */
+  voiceCommandsEnabled: boolean;
+  /** Brain-Computer Interface / Assistive Switch Access */
+  bciEnabled: boolean;
 };
 
 const initialState: RoleState = {
@@ -14,11 +20,13 @@ const initialState: RoleState = {
   admin: false,
   simplifiedUi: false,
   fontScale: 0,
+  ttsEnabled: false,
+  voiceCommandsEnabled: false,
+  bciEnabled: false,
 };
 
 const roleSlice = createSlice({
   name: 'role',
-  // Root state shape is { user, admin, simplifiedUi }
   initialState,
   reducers: {
     selectUser: state => {
@@ -35,10 +43,34 @@ const roleSlice = createSlice({
     setFontScale: (state, action: PayloadAction<number>) => {
       state.fontScale = action.payload;
     },
+    setTtsEnabled: (state, action: PayloadAction<boolean>) => {
+      state.ttsEnabled = action.payload;
+    },
+    setVoiceCommandsEnabled: (state, action: PayloadAction<boolean>) => {
+      state.voiceCommandsEnabled = action.payload;
+    },
+    setBciEnabled: (state, action: PayloadAction<boolean>) => {
+      state.bciEnabled = action.payload;
+    },
+    setAllAccessibility: (state, action: PayloadAction<Partial<RoleState>>) => {
+      if (action.payload.simplifiedUi !== undefined) state.simplifiedUi = action.payload.simplifiedUi;
+      if (action.payload.fontScale !== undefined) state.fontScale = action.payload.fontScale;
+      if (action.payload.ttsEnabled !== undefined) state.ttsEnabled = action.payload.ttsEnabled;
+      if (action.payload.voiceCommandsEnabled !== undefined) state.voiceCommandsEnabled = action.payload.voiceCommandsEnabled;
+      if (action.payload.bciEnabled !== undefined) state.bciEnabled = action.payload.bciEnabled;
+    },
   },
 });
 
-export const { selectUser, selectAdmin, setSimplifiedUi, setFontScale } =
-  roleSlice.actions;
+export const {
+  selectUser,
+  selectAdmin,
+  setSimplifiedUi,
+  setFontScale,
+  setTtsEnabled,
+  setVoiceCommandsEnabled,
+  setBciEnabled,
+  setAllAccessibility,
+} = roleSlice.actions;
 export default roleSlice.reducer;
 

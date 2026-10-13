@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import firestore from '@react-native-firebase/firestore';
 import type { RootStackParamList } from '../../../navigation/MainStack';
 import MainLayout from '../../../components/general/MainLayout';
 import { ScreenHeader } from '../../../components/general/ScreenHeader';
@@ -55,15 +56,101 @@ export function AdminFeedEngagementListBody({ postId, kind }: Props) {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const post = useMemo(
+  const [livePost, setLivePost] = useState<any>(null);
+  const [livePeople, setLivePeople] = useState<FeedEngagementPerson[]>([]);
+
+  useEffect(() => {
+    const unsubPost = firestore()
+      .collection('posts')
+      .doc(postId)
+      .onSnapshot(
+        doc => {
+          if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+            const d = doc.data() || {};
+            setLivePost({
+              id: doc.id,
+              content: d.text || d.content || '',
+              likes: d.likesCount || 0,
+              comments: d.commentsCount || 0,
+              shares: d.sharesCount || 0,
+            });
+          }
+        },
+        () => {},
+      );
+
+    return () => unsubPost();
+  }, [postId]);
+
+  useEffect(() => {
+    if (kind === 'comments') {
+      const unsubComments = firestore()
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(
+          snap => {
+            if (snap && !snap.empty) {
+              const mapped: FeedEngagementPerson[] = snap.docs.map(d => {
+                const data = d.data();
+                return {
+                  rowId: d.id,
+                  userId: data.authorUserId || data.userId || d.id,
+                  name: data.authorName || data.userName || 'Member',
+                  subtitle: 'Commented on post',
+                  avatarUrl: data.authorAvatar || undefined,
+                  avatarColor: Colors.adminStatsBlue,
+                  detail: data.text || '',
+                };
+              });
+              setLivePeople(mapped);
+            }
+          },
+          () => {},
+        );
+      return () => unsubComments();
+    } else if (kind === 'likes') {
+      const unsubLikes = firestore()
+        .collection('posts')
+        .doc(postId)
+        .collection('likes')
+        .onSnapshot(
+          snap => {
+            if (snap && !snap.empty) {
+              const mapped: FeedEngagementPerson[] = snap.docs.map(d => {
+                const data = d.data();
+                return {
+                  rowId: d.id,
+                  userId: data.userId || d.id,
+                  name: data.userName || data.name || 'Member',
+                  subtitle: 'Liked this post',
+                  avatarUrl: data.avatarUrl || undefined,
+                  avatarColor: Colors.adminStatsBlue,
+                };
+              });
+              setLivePeople(mapped);
+            }
+          },
+          () => {},
+        );
+      return () => unsubLikes();
+    }
+  }, [postId, kind]);
+
+  const mockPost = useMemo(
     () => MOCK_NEWS_POSTS.find(p => p.id === postId),
     [postId],
   );
 
-  const people = useMemo(
+  const post = livePost || mockPost;
+
+  const mockPeople = useMemo(
     () => getFeedEngagementPeople(postId, kind),
     [postId, kind],
   );
+
+  const people = livePost ? livePeople : (livePeople.length > 0 ? livePeople : mockPeople);
 
   const onRowPress = useCallback(
     (userId: string) => {

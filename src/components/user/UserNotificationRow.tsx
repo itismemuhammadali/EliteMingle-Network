@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { UserAppNotification } from '../../constants/userNotificationsData';
 import { Colors } from '../../constants/colors';
@@ -47,6 +47,7 @@ function HeartGlyph({ color }: { color: string }) {
 
 export interface UserNotificationRowProps {
   notification: UserAppNotification;
+  onPress?: () => void;
 }
 
 function FriendGlyph({ color }: { color: string }) {
@@ -79,7 +80,10 @@ function NotificationGlyph({ type }: { type: UserAppNotification['type'] }) {
   }
 }
 
-export function UserNotificationRow({ notification }: UserNotificationRowProps) {
+export function UserNotificationRow({
+  notification,
+  onPress,
+}: UserNotificationRowProps) {
   const unread = !notification.isRead;
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
@@ -158,11 +162,14 @@ export function UserNotificationRow({ notification }: UserNotificationRowProps) 
   );
 
   return (
-    <View
+    <TouchableOpacity
       style={[
         styles.card,
         unread ? styles.cardUnread : styles.cardRead,
       ]}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="button"
     >
       <View style={styles.iconCircle}>
         <NotificationGlyph type={notification.type} />
@@ -183,6 +190,6 @@ export function UserNotificationRow({ notification }: UserNotificationRowProps) 
           {notification.subtitle}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }

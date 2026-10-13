@@ -1,66 +1,64 @@
-import React, { useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
 } from 'react-native';
-import { Formik } from 'formik';
-import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MainLayout from '../../../components/general/MainLayout';
-import {
-  UserPasswordField,
-  UserChangePasswordInfoBanner,
-} from '../../../components/user';
+import { UserChangePasswordInfoBanner } from '../../../components/user';
 import ArrowLeftIcon from '../../../assets/Icons/arrowLeft.svg';
 import type { UserStackParamList } from '../../../navigation/User/types';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
+import auth from '@react-native-firebase/auth';
 
 const H_PAD = UtilityMethods.wp(5);
-
-const PASSWORD_COMPLEXITY =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-
-const ValidationSchema = Yup.object().shape({
-  currentPassword: Yup.string().required('Current password is required'),
-  newPassword: Yup.string()
-    .required('New password is required')
-    .min(8, 'Must be at least 8 characters')
-    .matches(
-      PASSWORD_COMPLEXITY,
-      'Include uppercase, lowercase, number, and special character',
-    ),
-  confirmPassword: Yup.string()
-    .required('Please confirm your new password')
-    .oneOf([Yup.ref('newPassword')], 'Passwords must match'),
-});
-
-interface FormValues {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
-const initialValues: FormValues = {
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-};
 
 export function UserChangePasswordScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const currentUser = auth().currentUser;
+  const email = currentUser?.email || '';
 
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
+
+  const handleSendEmail = async () => {
+    if (!email) {
+      Alert.alert('Error', 'No registered email found for this account.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await auth().sendPasswordResetEmail(email);
+      Alert.alert(
+        'Email Sent',
+        'A password reset link has been sent to your email. Please open the link in your browser to set your new password.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }],
+      );
+    } catch (error: any) {
+      if (error?.code === 'auth/too-many-requests') {
+        Alert.alert(
+          'Please Wait',
+          'Too many requests. Please wait a minute before requesting another email.',
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          error?.message || 'Failed to send password reset email. Please try again.',
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
@@ -100,7 +98,29 @@ export function UserChangePasswordScreen() {
       },
       body: {
         paddingHorizontal: H_PAD,
-        paddingTop: UtilityMethods.hp(1.75),
+        paddingTop: UtilityMethods.hp(2.5),
+      },
+      emailCard: {
+        backgroundColor: '#F8F5FB',
+        borderWidth: 1,
+        borderColor: '#E6DAF2',
+        borderRadius: UtilityMethods.wp(3),
+        paddingVertical: UtilityMethods.hp(2),
+        paddingHorizontal: UtilityMethods.wp(4),
+        marginBottom: UtilityMethods.hp(3),
+      },
+      emailLabel: {
+        fontSize: FontSize.VALUE(12),
+        fontWeight: '600',
+        color: Colors.textGrey,
+        marginBottom: UtilityMethods.hp(0.5),
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+      },
+      emailValue: {
+        fontSize: FontSize.VALUE(16),
+        fontWeight: '700',
+        color: Colors.primaryPurple,
       },
       primaryBtn: {
         alignItems: 'center',
@@ -108,8 +128,8 @@ export function UserChangePasswordScreen() {
         backgroundColor: Colors.userProfilePurple,
         paddingVertical: UtilityMethods.hp(1.75),
         borderRadius: UtilityMethods.wp(8),
-        marginTop: UtilityMethods.hp(0.5),
-        marginBottom: UtilityMethods.hp(1.25),
+        marginTop: UtilityMethods.hp(1),
+        marginBottom: UtilityMethods.hp(1.5),
       },
       primaryBtnText: {
         fontSize: FontSize.VALUE(16),
@@ -165,88 +185,40 @@ export function UserChangePasswordScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.body}>
-          <UserChangePasswordInfoBanner />
+      <View style={styles.body}>
+        <UserChangePasswordInfoBanner
+          title="Reset Password via Email"
+          subtitle="We will send a password reset link to your email address. You can open the link in your browser to easily set a new password."
+        />
 
-          <Formik
-            initialValues={initialValues}
-            validationSchema={ValidationSchema}
-            onSubmit={() => {
-              Alert.alert('Success', 'Your password has been updated.');
-              navigation.goBack();
-            }}
-          >
-            {({
-              values,
-              errors,
-              touched,
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              submitCount,
-            }) => (
-              <View>
-                <UserPasswordField
-                  label="Current Password"
-                  placeholder="Enter current password"
-                  value={values.currentPassword}
-                  onChangeText={handleChange('currentPassword')}
-                  onBlur={handleBlur('currentPassword')}
-                  error={
-                    touched.currentPassword || submitCount > 0
-                      ? errors.currentPassword
-                      : undefined
-                  }
-                />
-                <UserPasswordField
-                  label="New Password"
-                  placeholder="Enter new password"
-                  value={values.newPassword}
-                  onChangeText={handleChange('newPassword')}
-                  onBlur={handleBlur('newPassword')}
-                  error={
-                    touched.newPassword || submitCount > 0
-                      ? errors.newPassword
-                      : undefined
-                  }
-                />
-                <UserPasswordField
-                  label="Confirm New Password"
-                  placeholder="Re-enter new password"
-                  value={values.confirmPassword}
-                  onChangeText={handleChange('confirmPassword')}
-                  onBlur={handleBlur('confirmPassword')}
-                  error={
-                    touched.confirmPassword || submitCount > 0
-                      ? errors.confirmPassword
-                      : undefined
-                  }
-                />
+        {email ? (
+          <View style={styles.emailCard}>
+            <Text style={styles.emailLabel}>Registered Email</Text>
+            <Text style={styles.emailValue}>{email}</Text>
+          </View>
+        ) : null}
 
-                <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={() => handleSubmit()}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.primaryBtnText}>Update Password</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.secondaryBtn}
-                  onPress={handleBack}
-                  activeOpacity={0.88}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.secondaryBtnText}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </Formik>
-        </View>
-      </KeyboardAvoidingView>
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={handleSendEmail}
+          activeOpacity={0.88}
+          disabled={isSubmitting}
+          accessibilityRole="button"
+        >
+          <Text style={styles.primaryBtnText}>
+            {isSubmitting ? 'Sending...' : 'Send Email'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryBtn}
+          onPress={handleBack}
+          activeOpacity={0.88}
+          accessibilityRole="button"
+        >
+          <Text style={styles.secondaryBtnText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
     </MainLayout>
   );
 }

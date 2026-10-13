@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
+import { VoiceMemoPlayer } from '../../../components/user/VoiceMemoPlayer';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 import type { RootStackParamList } from '../../../navigation/MainStack';
 import MainLayout from '../../../components/general/MainLayout';
 import { ScreenHeader } from '../../../components/general/ScreenHeader';
@@ -12,7 +15,9 @@ import {
   WarnIcon,
   BlockIcon,
   PersonIcon,
+  DeleteIcon,
 } from '../../../components/admin/icons';
+import { deletePost } from '../../../services/postService';
 import ShareIconSvg from '../../../assets/Icons/share.svg';
 
 const FilledHeartIcon = ({ size = 24, color = '#F44336' }: { size?: number; color?: string }) => (
@@ -40,14 +45,122 @@ export function FeedDetailsScreen() {
     >();
   const route = useRoute<RouteProp<RootStackParamList, 'FeedDetails'>>();
   const insets = useSafeAreaInsets();
-  const { postId } = route.params;
+  const { postId = '' } = route.params || {};
 
-  const post = MOCK_NEWS_POSTS.find(p => p.id === postId);
+  const [livePost, setLivePost] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!postId) {
+      setLoading(false);
+      return;
+    }
+    const unsub = firestore()
+      .collection('posts')
+      .doc(postId)
+      .onSnapshot(
+        doc => {
+          if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+            const d = doc.data() || {};
+            setLivePost({
+              id: doc.id,
+              userId: d.authorUserId || d.userId || '',
+              userName: d.authorName || d.userName || 'Member',
+              avatarColor: Colors.adminStatsBlue,
+              status: 'Community Post',
+              timeAgo: 'Recently',
+              content: d.text || d.content || '',
+              mediaType: d.mediaType || 'none',
+              mediaUrl: d.mediaUrl || '',
+              audioUrl: d.mediaType === 'audio' ? d.mediaUrl : undefined,
+              imageUrl: d.mediaType === 'image' ? d.mediaUrl : undefined,
+              videoUrl: d.mediaType === 'video' ? d.mediaUrl : undefined,
+              likes: d.likesCount || 0,
+              comments: d.commentsCount || 0,
+              shares: d.sharesCount || 0,
+            });
+          }
+          setLoading(false);
+        },
+        () => setLoading(false),
+      );
+    return () => unsub();
+  }, [postId]);
+
+  const mockPost = useMemo(
+    () => MOCK_NEWS_POSTS.find(p => p.id === postId),
+    [postId],
+  );
+
+  const post = livePost || mockPost;
   const [showWarnModal, setShowWarnModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeletePost = async () => {
+    setShowDeleteModal(false);
+    setDeleting(true);
+    try {
+      if (livePost) {
+        await deletePost(post.id, auth().currentUser?.uid || post.userId, true);
+      }
+      Alert.alert('Post Deleted', 'The post has been permanently removed.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Could not delete the post.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <MainLayout
+        isScrollable={false}
+        includeSafeArea={false}
+        barStyle="dark-content"
+        statusbarBackgrund={Colors.white}
+        bottomColor={Colors.adminBackgroundGrey}
+        style={{ backgroundColor: Colors.adminBackgroundGrey }}
+      >
+        <View style={[styles.headerBg, { paddingTop: insets.top * 0.4 }]}>
+          <ScreenHeader
+            title="Post Details"
+            onBackPress={() => navigation.goBack()}
+          />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.adminStatsBlue} />
+        </View>
+      </MainLayout>
+    );
+  }
 
   if (!post) {
-    return null;
+    return (
+      <MainLayout
+        isScrollable={false}
+        includeSafeArea={false}
+        barStyle="dark-content"
+        statusbarBackgrund={Colors.white}
+        bottomColor={Colors.adminBackgroundGrey}
+        style={{ backgroundColor: Colors.adminBackgroundGrey }}
+      >
+        <View style={[styles.headerBg, { paddingTop: insets.top * 0.4 }]}>
+          <ScreenHeader
+            title="Post Details"
+            onBackPress={() => navigation.goBack()}
+          />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: FontSize.VALUE(16), color: Colors.placeholderGrey }}>
+            Post not found.
+          </Text>
+        </View>
+      </MainLayout>
+    );
   }
 
   return (
@@ -88,7 +201,7 @@ export function FeedDetailsScreen() {
                 {(post?.userName || '')
                   .split(' ')
                   .filter(Boolean)
-                  .map(n => n[0])
+                  .map((n: string) => n[0])
                   .join('') || 'U'}
               </Text>
             </View>
@@ -115,6 +228,21 @@ export function FeedDetailsScreen() {
           </View>
 
           <Text style={styles.content}>{post.content}</Text>
+
+          {post.audioUrl ? (
+            <VoiceMemoPlayer audioUri={post.audioUrl} />
+          ) : post.imageUrl ? (
+            <Image
+              source={{ uri: post.imageUrl }}
+              style={{
+                width: '100%',
+                height: UtilityMethods.hp(25),
+                borderRadius: UtilityMethods.wp(2.5),
+                marginVertical: UtilityMethods.hp(1.5),
+              }}
+              resizeMode="cover"
+            />
+          ) : null}
 
           <View style={styles.engagementContainer}>
             <TouchableOpacity
@@ -174,16 +302,25 @@ export function FeedDetailsScreen() {
               onPress={() => setShowWarnModal(true)}
               activeOpacity={0.7}
             >
-              <WarnIcon size={UtilityMethods.wp(5)} color={Colors.white} />
-              <Text style={styles.actionButtonText}>Send Warning</Text>
+              <WarnIcon size={UtilityMethods.wp(4)} color={Colors.white} />
+              <Text style={styles.actionButtonText}>Warn</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.blockButton}
               onPress={() => setShowBlockModal(true)}
               activeOpacity={0.7}
             >
-              <BlockIcon size={UtilityMethods.wp(5)} color={Colors.white} />
-              <Text style={styles.actionButtonText}>Block Post</Text>
+              <BlockIcon size={UtilityMethods.wp(4)} color={Colors.white} />
+              <Text style={styles.actionButtonText}>Block</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => setShowDeleteModal(true)}
+              activeOpacity={0.7}
+              disabled={deleting}
+            >
+              <DeleteIcon size={UtilityMethods.wp(4)} color={Colors.white} />
+              <Text style={styles.actionButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -202,6 +339,13 @@ export function FeedDetailsScreen() {
         entityName={post.userName}
         onConfirm={() => setShowBlockModal(false)}
         onCancel={() => setShowBlockModal(false)}
+      />
+      <ConfirmationModal
+        visible={showDeleteModal}
+        type="deletePost"
+        entityName={post.userName}
+        onConfirm={handleDeletePost}
+        onCancel={() => setShowDeleteModal(false)}
       />
     </MainLayout>
   );
@@ -339,6 +483,16 @@ const styles = StyleSheet.create({
     borderRadius: UtilityMethods.wp(2),
   },
   blockButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: UtilityMethods.wp(2),
+    backgroundColor: '#4B5563',
+    paddingVertical: UtilityMethods.hp(1.5),
+    borderRadius: UtilityMethods.wp(2),
+  },
+  deleteButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',

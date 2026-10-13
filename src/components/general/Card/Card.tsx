@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { ReactNode } from 'react';
+import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import { Colors } from '../../../constants/colors';
 
 interface Props {
-  children: any;
-  style: any;
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
 }
 
 const Card: React.FC<Props> = ({ children, style }) => {

@@ -12,9 +12,11 @@ import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import { UserPhotoIcon, UserVideoIcon, UserFeelingIcon } from './icons';
+import { ProfileAvatar } from '../general/ProfileAvatar';
 
 export interface UserCreatePostCardProps {
   placeholder?: string;
+  avatarUri?: string | null;
   avatarSource?: ImageSourcePropType;
   avatarInitials?: string;
   onComposerPress?: () => void;
@@ -27,6 +29,7 @@ const AV = UtilityMethods.wp(10);
 
 export function UserCreatePostCard({
   placeholder = "What's on your mind?",
+  avatarUri,
   avatarSource,
   avatarInitials = 'NS',
   onComposerPress,
@@ -34,6 +37,12 @@ export function UserCreatePostCard({
   onVideoPress,
   onFeelingPress,
 }: UserCreatePostCardProps) {
+  const resolvedUri =
+    avatarUri !== undefined
+      ? avatarUri
+      : avatarSource && typeof avatarSource === 'object' && 'uri' in avatarSource
+      ? (avatarSource as { uri?: string }).uri
+      : undefined;
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
       card: {
@@ -106,13 +115,7 @@ export function UserCreatePostCard({
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        {avatarSource ? (
-          <Image source={avatarSource} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarFallback}>
-            <Text style={styles.avatarFallbackText}>{avatarInitials}</Text>
-          </View>
-        )}
+        <ProfileAvatar uri={resolvedUri} size={AV} />
         <TouchableOpacity
           style={styles.inputShell}
           activeOpacity={0.85}

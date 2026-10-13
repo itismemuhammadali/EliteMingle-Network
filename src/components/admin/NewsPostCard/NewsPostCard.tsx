@@ -7,6 +7,7 @@ import {
   EyeIcon,
   WarnIcon,
   BlockIcon,
+  DeleteIcon,
 } from '../icons';
 import ShareIcon from '../../../assets/Icons/share.svg';
 import { Colors } from '../../../constants/colors';
@@ -35,6 +36,7 @@ interface NewsPostCardProps {
   onViewPress?: (post: NewsPost) => void;
   onWarnPress?: (post: NewsPost) => void;
   onBlockPress?: (post: NewsPost) => void;
+  onDeletePress?: (post: NewsPost) => void;
   style?: any;
 }
 
@@ -43,6 +45,7 @@ export function NewsPostCard({
   onViewPress,
   onWarnPress,
   onBlockPress,
+  onDeletePress,
   style,
 }: NewsPostCardProps) {
   return (
@@ -125,8 +128,16 @@ export function NewsPostCard({
           onPress={() => onBlockPress?.(post)}
           activeOpacity={0.7}
         >
-          <BlockIcon size={UtilityMethods.wp(4)} color="#F44336" />
+          <BlockIcon size={UtilityMethods.wp(4)} color="#4B5563" />
           <Text style={styles.blockButtonText}>Block</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => onDeletePress?.(post)}
+          activeOpacity={0.7}
+        >
+          <DeleteIcon size={UtilityMethods.wp(4)} color={Colors.adminErrorRed} />
+          <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
       </View>
@@ -276,11 +287,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: UtilityMethods.wp(1.5),
-    backgroundColor: Colors.adminErrorRedLight,
+    backgroundColor: '#F3F4F6',
     paddingVertical: UtilityMethods.hp(1.2),
     borderRadius: UtilityMethods.wp(2),
   },
   blockButtonText: {
+    fontSize: FontSize.VALUE(14),
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  deleteButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: UtilityMethods.wp(1.5),
+    backgroundColor: Colors.adminErrorRedLight,
+    paddingVertical: UtilityMethods.hp(1.2),
+    borderRadius: UtilityMethods.wp(2),
+  },
+  deleteButtonText: {
     fontSize: FontSize.VALUE(14),
     fontWeight: '600',
     color: Colors.adminErrorRed,

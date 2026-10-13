@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { UtilityMethods } from '../../../utility/UtilityMethods';
+import UtilityMethods from '../../../utility/UtilityMethods';
 
 interface ScreenWrapperProps {
   children: any;

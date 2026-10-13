@@ -18,10 +18,14 @@ import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 
+import { useLanguage } from '../../../context/LanguageContext';
+import type { LanguageCode } from '../../../services/localizationService';
+
 export function LanguageScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList, 'Language'>>();
-  const [selectedId, setSelectedId] = useState<string>('en');
+  const { language, setLanguage, t } = useLanguage();
+  const [selectedId, setSelectedId] = useState<string>(language);
 
   const selected = useMemo(
     () =>
@@ -29,7 +33,8 @@ export function LanguageScreen() {
     [selectedId],
   );
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    await setLanguage(selectedId as LanguageCode);
     navigation.goBack();
   };
 
@@ -42,33 +47,40 @@ export function LanguageScreen() {
       bottomColor={Colors.adminBackgroundGrey}
     >
       <ScreenHeader
-        title="Language"
-        subtitle="Select your preferred language"
+        title={t('languageScreen.title', 'Language')}
+        subtitle={t('languageScreen.subtitle', 'Select your preferred language')}
         onBackPress={() => navigation.goBack()}
       />
       <View style={styles.headerBorder} />
 
       <ScrollView contentContainerStyle={styles.content} bounces={false}>
         <LanguageCurrentCard
-        languageName={selected.labelEn}
-        nativeLabel={selected.labelNative}
-      />
+          languageName={selected.labelEn}
+          nativeLabel={selected.labelNative}
+          label={t('languageScreen.currentLanguageTitle', 'Current Language')}
+        />
 
-      <LanguageAvailableSection
-        items={LANGUAGE_OPTIONS}
-        selectedId={selectedId}
-        onSelect={(item: LanguageOption) => setSelectedId(item.id)}
-      />
+        <LanguageAvailableSection
+          items={LANGUAGE_OPTIONS}
+          selectedId={selectedId}
+          onSelect={(item: LanguageOption) => setSelectedId(item.id)}
+          sectionTitle={t('languageScreen.availableLanguagesTitle', 'Available Languages')}
+        />
 
-      <LanguageSettingsNotice />
+        <LanguageSettingsNotice
+          title={t('languageScreen.title', 'Language')}
+          body={t('languageScreen.settingsNotice')}
+        />
 
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={handleSave}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.saveButtonText}>Save Language Preference</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSave}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.saveButtonText}>
+            {t('languageScreen.saveButton', 'Save Language Preference')}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </MainLayout>
   );

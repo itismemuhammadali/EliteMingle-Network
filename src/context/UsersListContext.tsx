@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import type { UserCardData } from '../components/admin/UserCard';
 
@@ -60,36 +61,64 @@ export function UsersListProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<UserCardData[]>([]);
 
   // Real-time list of all registered users for the admin panel.
+  // Only listens when an authenticated user is signed in to avoid
+  // permission-denied errors on startup.
   useEffect(() => {
-    const unsubscribe = firestore()
-      .collection('users')
-      .onSnapshot(
-        snapshot => {
-          if (!snapshot) {
-            setUsers([]);
-            return;
-          }
-          const list: UserCardData[] = snapshot.docs.map(doc => {
-            const d = doc.data();
-            const avatar =
-              d.avatarUri || d.profilePicture || d.avatarUrl || '';
-            return {
-              id: doc.id,
-              name: d.fullName || d.displayName || d.name || 'User',
-              role: d.role || 'User',
-              email: d.email || '',
-              phone: d.phone || '',
-              status: (d.status as UserCardData['status']) || 'active',
-              avatarColor: d.avatarColor || colorForId(doc.id),
-              avatarUri:
-                avatar && String(avatar).startsWith('http') ? avatar : undefined,
-            };
-          });
-          setUsers(list);
-        },
-        error => console.error('Admin users snapshot error:', error),
-      );
-    return () => unsubscribe();
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = auth().onAuthStateChanged(firebaseUser => {
+      if (!firebaseUser) {
+        if (unsubscribeSnapshot) {
+          unsubscribeSnapshot();
+          unsubscribeSnapshot = null;
+        }
+        setUsers([]);
+        return;
+      }
+
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+
+      unsubscribeSnapshot = firestore()
+        .collection('users')
+        .onSnapshot(
+          snapshot => {
+            if (!snapshot) {
+              setUsers([]);
+              return;
+            }
+            const list: UserCardData[] = snapshot.docs.map(doc => {
+              const d = doc.data();
+              const avatar =
+                d.avatarUri || d.profilePicture || d.avatarUrl || '';
+              return {
+                id: doc.id,
+                name: d.fullName || d.displayName || d.name || 'User',
+                role: d.role || 'User',
+                email: d.email || '',
+                phone: d.phone || '',
+                status: (d.status as UserCardData['status']) || 'active',
+                avatarColor: d.avatarColor || colorForId(doc.id),
+                avatarUri:
+                  avatar && String(avatar).startsWith('http') ? avatar : undefined,
+              };
+            });
+            setUsers(list);
+          },
+          error => {
+            // Keep as warning so unhandled errors do not pop up LogBox in development
+            console.warn('Admin users snapshot error:', error);
+          },
+        );
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+    };
   }, []);
 
   const addUser = useCallback(

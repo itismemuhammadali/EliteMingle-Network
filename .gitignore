@@ -26,3 +26,5 @@ emulator-data/
 
 # firebase emulator export dumps
 firebase-export-*/
+android/local.properties
+emulator_test.png

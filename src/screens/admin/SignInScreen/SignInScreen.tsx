@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { Formik } from 'formik';
 import {
   TitleText,
@@ -39,21 +41,55 @@ type SignInNavigationProp = NativeStackNavigationProp<
 const initialValues: SignInFormValues = {
   email: '',
   password: '',
-  role: 'moderator',
+  role: 'user',
 };
 
 export function SignInScreen() {
   const navigation = useNavigation<SignInNavigationProp>();
   const dispatch = useAppDispatch();
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle, signInWithApple } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleForgotPassword = () => {
     navigation.navigate('ForgotPassword');
   };
-  const handleContactAdmin = () => {};
-  const handleGoogleSignIn = () => {};
-  const handleAppleSignIn = () => {};
+  const handleContactAdmin = () => {
+    Linking.openURL('mailto:support@epm.com?subject=Support%20Request').catch(() =>
+      Alert.alert('Contact Support', 'Please contact support at support@epm.com'),
+    );
+  };
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
+    try {
+      const credential = await signInWithGoogle();
+      if (credential?.user) {
+        dispatch(selectUser());
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Google Sign In Failed',
+        error?.message || 'Failed to sign in with Google. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  const handleAppleSignIn = async () => {
+    setIsSubmitting(true);
+    try {
+      const credential = await signInWithApple();
+      if (credential?.user) {
+        dispatch(selectUser());
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Apple Sign In Failed',
+        error?.message || 'Failed to sign in with Apple. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <MainLayout
@@ -75,12 +111,28 @@ export function SignInScreen() {
           onSubmit={async (values) => {
             setIsSubmitting(true);
             try {
+              const credential = await signIn(values.email, values.password);
+              const uid = credential.user?.uid;
+              if (!uid) throw new Error('User identifier missing.');
+
+              // Verify role in Firestore
+              const userSnap = await firestore().collection('users').doc(uid).get();
+              const actualRole = (userSnap.data()?.role || 'User').toLowerCase();
+
               if (values.role === 'admin') {
+                if (actualRole !== 'admin') {
+                  await auth().signOut();
+                  dispatch(selectUser());
+                  Alert.alert(
+                    'Access Denied',
+                    'This account does not have administrator privileges.',
+                  );
+                  return;
+                }
                 dispatch(selectAdmin());
               } else {
                 dispatch(selectUser());
               }
-              await signIn(values.email, values.password);
             } catch (error: any) {
 
               let message = 'An error occurred. Please try again.';
@@ -127,9 +179,9 @@ export function SignInScreen() {
                   subtitle="Limited Access"
                   iconSelected={PeopleIconSelected}
                   iconDefault={PeopleIconDefault}
-                  selected={values.role === 'moderator'}
+                  selected={values.role !== 'admin'}
                   onPress={() => {
-                    setFieldValue('role', 'moderator');
+                    setFieldValue('role', 'user');
                     dispatch(selectUser());
                   }}
                 />
@@ -177,29 +229,38 @@ export function SignInScreen() {
                 disabled={isSubmitting}
               />
 
-              <View style={styles.separator}>
-                <View style={styles.separatorLine} />
-                <Text style={styles.separatorText}>or</Text>
-                <View style={styles.separatorLine} />
-              </View>
+              {values.role !== 'admin' && (
+                <>
+                  <View style={styles.separator}>
+                    <View style={styles.separatorLine} />
+                    <Text style={styles.separatorText}>or</Text>
+                    <View style={styles.separatorLine} />
+                  </View>
 
-              <SocialLoginButton
-                provider="google"
-                onPress={handleGoogleSignIn}
-              />
-              <SocialLoginButton provider="apple" onPress={handleAppleSignIn} />
+                  <SocialLoginButton
+                    provider="google"
+                    onPress={handleGoogleSignIn}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <SocialLoginButton
+                      provider="apple"
+                      onPress={handleAppleSignIn}
+                    />
+                  )}
+                </>
+              )}
 
               <View style={styles.footer}>
                 <Text style={styles.footerText}>Don't have an account? </Text>
                 <TouchableOpacity
                   onPress={
-                    values.role === 'moderator'
+                    values.role !== 'admin'
                       ? () => navigation.navigate('SignUp')
                       : handleContactAdmin
                   }
                 >
                   <Text style={styles.contactAdminText}>
-                    {values.role === 'moderator' ? 'Sign up' : 'Contact Admin'}
+                    {values.role !== 'admin' ? 'Sign up' : 'Contact Admin'}
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -1,5 +1,19 @@
-import { Platform, StyleSheet } from 'react-native';
-import { Fonts, Colors } from '../assets';
+import { StyleSheet } from 'react-native';
+
+const Fonts = {
+  REGULAR: 'System',
+  MEDIUM: 'System',
+  BOLD: 'System',
+  SEMIBOLD: 'System',
+};
+
+const Colors = {
+  WHITE: '#FFFFFF',
+  BLACK: '#000000',
+  PLACEHOLDER: '#9E9E9E',
+  Label: '#666666',
+  LightOrange: '#FF9800',
+};
 import FontSize from './FontSize';
 import UtilityMethods from './UtilityMethods';
 

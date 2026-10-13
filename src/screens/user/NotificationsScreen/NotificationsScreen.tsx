@@ -18,6 +18,7 @@ import { type UserAppNotification } from '../../../constants/userNotificationsDa
 import {
   subscribeToNotifications,
   markAllNotificationsRead,
+  markNotificationAsRead,
 } from '../../../services/notificationService';
 import type { UserStackParamList } from '../../../navigation/User/types';
 import UtilityMethods from '../../../utility/UtilityMethods';
@@ -45,9 +46,10 @@ export function NotificationsScreen() {
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
 
   const [notifications, setNotifications] = useState<UserAppNotification[]>([]);
-  const currentUserId = auth().currentUser?.uid || 'dev_user_123';
+  const currentUserId = auth().currentUser?.uid || '';
 
   useEffect(() => {
+    if (!currentUserId) return;
     const unsubscribe = subscribeToNotifications(currentUserId, setNotifications);
     return () => unsubscribe();
   }, [currentUserId]);
@@ -62,14 +64,73 @@ export function NotificationsScreen() {
   );
 
   const markAllRead = useCallback(() => {
-    markAllNotificationsRead(currentUserId);
+    if (currentUserId) {
+      markAllNotificationsRead(currentUserId);
+    }
   }, [currentUserId]);
+
+  const handleNotificationPress = useCallback(
+    (item: UserAppNotification) => {
+      markNotificationAsRead(item.id);
+
+      if (item.type === 'message') {
+        const peerName = item.title.replace(/^New message from\s*/i, '').trim() || 'User';
+        navigation.navigate('Chat', {
+          conversationId: item.conversationId,
+          peerId: item.actorId || '',
+          peerName,
+          peerAvatarUri: '',
+          statusText: 'Online',
+          isOnlineStatus: true,
+        });
+        return;
+      }
+
+      if (item.type === 'like' || item.type === 'comment') {
+        if (item.postId) {
+          navigation.navigate('PostComments', {
+            postId: item.postId,
+            authorName: item.title,
+          });
+          return;
+        }
+      }
+
+      if (item.type === 'friend_request' || item.type === 'friend_accept') {
+        if (item.actorId) {
+          navigation.navigate('OtherUserProfile', {
+            userId: item.actorId,
+          });
+          return;
+        }
+      }
+
+      if (item.postId) {
+        navigation.navigate('PostComments', {
+          postId: item.postId,
+          authorName: item.title,
+        });
+        return;
+      }
+
+      if (item.groupId) {
+        navigation.navigate('GroupDetail', {
+          groupId: item.groupId,
+        });
+        return;
+      }
+    },
+    [navigation],
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: UserAppNotification }) => (
-      <UserNotificationRow notification={item} />
+      <UserNotificationRow
+        notification={item}
+        onPress={() => handleNotificationPress(item)}
+      />
     ),
-    [],
+    [handleNotificationPress],
   );
 
   const styles = useUserFontStyles(() =>

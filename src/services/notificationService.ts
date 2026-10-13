@@ -22,6 +22,8 @@ interface CreateNotificationParams {
   preview?: string;
   /** Optional related post id for like/comment deep-linking later. */
   postId?: string;
+  conversationId?: string;
+  groupId?: string;
 }
 
 const docExists = (snap: any): boolean =>
@@ -53,7 +55,15 @@ function buildTitle(type: UserAppNotificationType, actorName: string): string {
 export const createNotification = async (
   params: CreateNotificationParams,
 ): Promise<void> => {
-  const { recipientId, actorId, type, preview = '', postId = '' } = params;
+  const {
+    recipientId,
+    actorId,
+    type,
+    preview = '',
+    postId = '',
+    conversationId = '',
+    groupId = '',
+  } = params;
   if (!recipientId || !actorId || recipientId === actorId) return;
 
   try {
@@ -88,6 +98,8 @@ export const createNotification = async (
       title: buildTitle(type, actorName),
       subtitle: preview,
       postId,
+      conversationId,
+      groupId,
       isRead: false,
       createdAt: firestore.FieldValue.serverTimestamp(),
     });
@@ -128,6 +140,10 @@ export const subscribeToNotifications = (
               subtitle: data.subtitle || '',
               timeAgo: formatTimeAgo(data.createdAt),
               isRead: !!data.isRead,
+              actorId: data.actorId,
+              postId: data.postId,
+              conversationId: data.conversationId,
+              groupId: data.groupId,
             };
           })
           .sort((a, b) => {
@@ -140,6 +156,21 @@ export const subscribeToNotifications = (
       },
       error => console.error('Notifications snapshot error:', error),
     );
+};
+
+/** Mark a single notification as read. */
+export const markNotificationAsRead = async (
+  notificationId: string,
+): Promise<void> => {
+  if (!notificationId) return;
+  try {
+    await firestore()
+      .collection('notifications')
+      .doc(notificationId)
+      .update({ isRead: true });
+  } catch (err) {
+    console.warn('markNotificationAsRead failed:', err);
+  }
 };
 
 /** Count of unread notifications, for a badge. */

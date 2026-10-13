@@ -21,6 +21,7 @@ import FontSize from '../../../utility/FontSize';
 
 export type ConfirmationModalType =
   | 'blockPost'
+  | 'deletePost'
   | 'sendWarning'
   | 'suspendUser'
   | 'deleteUser'
@@ -46,6 +47,18 @@ const MODAL_CONFIG: Record<
     confirmButtonColor: string;
   }
 > = {
+  deletePost: {
+    iconBgColor: Colors.adminErrorRed,
+    IconComponent: DeleteIcon,
+    title: 'Delete Post',
+    descriptionTemplate: name => ({
+      before: 'Are you sure you want to permanently delete this post by ',
+      name,
+      after: '? This action cannot be undone.',
+    }),
+    confirmText: 'Delete Post',
+    confirmButtonColor: Colors.adminErrorRed,
+  },
   blockPost: {
     iconBgColor: Colors.adminErrorRed,
     IconComponent: BlockIcon,

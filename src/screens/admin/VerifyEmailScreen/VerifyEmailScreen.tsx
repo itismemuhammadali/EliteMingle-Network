@@ -1,11 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { OtpInput } from 'react-native-otp-entry';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import Logo from '../../../assets/svgs/logo.svg';
-import { TitleText, Button } from '../../../components/general';
+import EmailIcon from '../../../assets/svgs/EmailIcon.svg';
+import { TitleText } from '../../../components/general';
 import DescriptionText from '../../../components/general/descriptionText/DescriptionText';
 import Card from '../../../components/general/Card/Card';
 import { useCountdown } from '../../../hooks/useCountdown';
@@ -17,41 +15,69 @@ import { AuthStackParamList } from '../../../navigation/Admin/types';
 import { useAuth } from '../../../context/AuthContext';
 
 type VerifyEmailRouteProp = RouteProp<AuthStackParamList, 'VerifyEmail'>;
-type VerifyEmailNavigationProp = NativeStackNavigationProp<
-  AuthStackParamList,
-  'VerifyEmail'
->;
 
 export function VerifyEmailScreen() {
   const route = useRoute<VerifyEmailRouteProp>();
-  const navigation = useNavigation<VerifyEmailNavigationProp>();
-  const email = route.params?.email ?? '';
-  const source = route.params?.source ?? 'forgotPassword';
-  const [otp, setOtp] = useState('');
-  const otpRef = useRef<any>(null);
-  const { secondsRemaining, canResend, reset, formatTime } = useCountdown(60);
+  const { user, reloadUser, sendVerificationEmail, signOut } = useAuth();
+  const email = route.params?.email || user?.email || '';
 
-  const { sendPasswordReset } = useAuth();
+  const [isResending, setIsResending] = useState(false);
+  const { secondsRemaining, canResend, reset } = useCountdown(60);
 
-  const handleVerifyCode = () => {
-    // In the emulator, we auto-verify — navigate to the next screen
-    if (source === 'signUp') {
-      navigation.navigate('CompleteProfile');
-    } else {
-      navigation.navigate('CreateNewPassword');
+  // Automatically check if the user verified their email in browser
+  useEffect(() => {
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const refreshedUser = await reloadUser();
+        if (refreshedUser?.emailVerified && isMounted) {
+          clearInterval(interval);
+        }
+      } catch (err) {
+        // Silently continue polling
+      }
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [reloadUser]);
+
+  const handleResend = async () => {
+    if (!canResend || isResending) {
+      return;
+    }
+    setIsResending(true);
+    try {
+      await sendVerificationEmail();
+      reset();
+      Alert.alert(
+        'Verification Email Sent',
+        'A fresh verification link has been sent to your email address. Please check your inbox and spam folder.',
+      );
+    } catch (error: any) {
+      if (error?.code === 'auth/too-many-requests') {
+        Alert.alert(
+          'Please Wait',
+          'Too many requests. Please wait a minute before requesting another verification email.',
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          error?.message || 'Failed to send verification email. Please try again.',
+        );
+      }
+    } finally {
+      setIsResending(false);
     }
   };
 
-  const handleResend = async () => {
-    reset();
-    otpRef.current?.clear();
+  const handleSignOut = async () => {
     try {
-      if (source === 'forgotPassword' && email) {
-        await sendPasswordReset(email);
-        Alert.alert('Email Sent', 'A new verification code has been sent to your email.');
-      }
+      await signOut();
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to resend verification code.');
+      console.warn('Sign out warning:', error);
     }
   };
 
@@ -63,59 +89,55 @@ export function VerifyEmailScreen() {
       contentContainerStyle={styles.contentContainer}
     >
       <View style={styles.headerSection}>
-          <Logo />
-          <TitleText style={styles.title}>Verify Your Email</TitleText>
-          <DescriptionText text="We've sent a 6-digit code to" />
-          {email ? (
-            <View style={styles.emailPill}>
-              <Text style={styles.emailText}>{email}</Text>
-            </View>
-          ) : null}
+        <Logo />
+        <TitleText style={styles.title}>Verify Your Email</TitleText>
+        <DescriptionText text="We sent a verification link to" />
+        {email ? (
+          <View style={styles.emailPill}>
+            <Text style={styles.emailText}>{email}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Card style={styles.card}>
+        <View style={styles.iconCircle}>
+          <EmailIcon width={UtilityMethods.wp(8)} height={UtilityMethods.hp(4)} stroke={Colors.primaryPurple} />
         </View>
 
-        <Card style={styles.card}>
-          <Text style={styles.otpLabel}>Verification Code</Text>
-          <OtpInput
-            ref={otpRef}
-            numberOfDigits={6}
-            onTextChange={setOtp}
-            focusColor={Colors.primaryPurple}
-            type="numeric"
-            theme={{
-              containerStyle: styles.otpContainer,
-              pinCodeContainerStyle: styles.otpBox,
-              pinCodeTextStyle: styles.otpTextStyle,
-              focusedPinCodeContainerStyle: styles.otpBoxFocused,
-              filledPinCodeContainerStyle: styles.otpBoxFilled,
-              focusStickStyle: styles.otpStick,
-            }}
-          />
+        <Text style={styles.cardHeading}>Confirm Your Email Address</Text>
+        <Text style={styles.cardSubtitle}>
+          Please check your inbox and tap the link to verify your account. Once verified in your browser, you will automatically proceed.
+        </Text>
 
-          <Button
-            title="Verify Code"
-            onPress={handleVerifyCode}
-            style={styles.verifyButton}
-          />
+        <View style={styles.waitingContainer}>
+          <ActivityIndicator size="small" color={Colors.primaryPurple} />
+          <Text style={styles.waitingText}>Waiting for email verification...</Text>
+        </View>
 
-          <View style={styles.resendRow}>
-            <Text style={styles.resendQuestion}>Didn't receive the code? </Text>
-            <TouchableOpacity onPress={handleResend}>
-              <Text style={styles.resendLink}>Resend</Text>
+        <View style={styles.resendRow}>
+          <Text style={styles.resendQuestion}>Did not receive the email? </Text>
+          {canResend ? (
+            <TouchableOpacity onPress={handleResend} disabled={isResending}>
+              <Text style={styles.resendLink}>
+                {isResending ? 'Sending...' : 'Resend Link'}
+              </Text>
             </TouchableOpacity>
-          </View>
-        </Card>
+          ) : (
+            <Text style={styles.countdownText}>
+              Resend in {secondsRemaining}s
+            </Text>
+          )}
+        </View>
+
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <Text style={styles.signOutText}>Use a different account</Text>
+        </TouchableOpacity>
+      </Card>
     </MainLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
   contentContainer: {
     paddingBottom: UtilityMethods.hp(4),
   },
@@ -134,6 +156,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: UtilityMethods.wp(4),
     borderRadius: UtilityMethods.wp(4),
     backgroundColor: 'rgba(133, 19, 140, 0.06)',
+    marginTop: UtilityMethods.hp(0.5),
   },
   emailText: {
     fontSize: FontSize.VALUE(14),
@@ -142,53 +165,56 @@ const styles = StyleSheet.create({
   },
   card: {
     marginTop: 0,
+    alignItems: 'center',
+    paddingHorizontal: UtilityMethods.wp(5),
+    paddingVertical: UtilityMethods.hp(3),
   },
-  otpLabel: {
-    fontSize: FontSize.VALUE(14),
-    fontWeight: '600',
-    color: Colors.textDark,
-    marginBottom: UtilityMethods.hp(1.5),
-  },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: UtilityMethods.hp(1),
-  },
-  otpBox: {
-    width: UtilityMethods.wp(13),
-    height: UtilityMethods.hp(6.5),
-    borderRadius: UtilityMethods.wp(3),
-    borderWidth: 2,
-    borderColor: Colors.borderGrey,
+  iconCircle: {
+    width: UtilityMethods.wp(16),
+    height: UtilityMethods.wp(16),
+    borderRadius: UtilityMethods.wp(8),
+    backgroundColor: 'rgba(133, 19, 140, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: UtilityMethods.hp(1.5),
   },
-  otpBoxFocused: {
-    borderColor: Colors.primaryPurple,
-  },
-  otpBoxFilled: {
-    borderColor: Colors.primaryPurple,
-  },
-  otpTextStyle: {
-    fontSize: FontSize.VALUE(16),
-    fontWeight: '600',
+  cardHeading: {
+    fontSize: FontSize.VALUE(18),
+    fontWeight: '700',
     color: Colors.textDark,
+    textAlign: 'center',
+    marginBottom: UtilityMethods.hp(1),
   },
-  otpStick: {
-    backgroundColor: Colors.primaryPurple,
-    width: 2,
+  cardSubtitle: {
+    fontSize: FontSize.VALUE(13),
+    lineHeight: FontSize.VALUE(19),
+    color: Colors.textGrey,
+    textAlign: 'center',
+    marginBottom: UtilityMethods.hp(2.5),
+    paddingHorizontal: UtilityMethods.wp(2),
   },
-  verifyButton: {
-    alignSelf: 'stretch',
+  waitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(133, 19, 140, 0.06)',
+    paddingVertical: UtilityMethods.hp(1.5),
+    paddingHorizontal: UtilityMethods.wp(4),
+    borderRadius: UtilityMethods.wp(8),
+    marginBottom: UtilityMethods.hp(1.5),
     width: '100%',
-    marginTop: UtilityMethods.hp(2),
+  },
+  waitingText: {
+    fontSize: FontSize.VALUE(14),
+    fontWeight: '600',
+    color: Colors.primaryPurple,
+    marginLeft: UtilityMethods.wp(2.5),
   },
   resendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: UtilityMethods.hp(2),
+    marginTop: UtilityMethods.hp(1),
   },
   resendQuestion: {
     fontSize: FontSize.VALUE(14),
@@ -197,6 +223,21 @@ const styles = StyleSheet.create({
   resendLink: {
     fontSize: FontSize.VALUE(14),
     fontWeight: '600',
-    color: '#0051DF',
+    color: Colors.primaryPurple,
+  },
+  countdownText: {
+    fontSize: FontSize.VALUE(14),
+    fontWeight: '500',
+    color: Colors.adminInactiveGrey,
+  },
+  signOutButton: {
+    marginTop: UtilityMethods.hp(2.5),
+    paddingVertical: UtilityMethods.hp(1),
+  },
+  signOutText: {
+    fontSize: FontSize.VALUE(13),
+    fontWeight: '500',
+    color: Colors.textGrey,
+    textDecorationLine: 'underline',
   },
 });

@@ -11,6 +11,7 @@ import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import { UserChevronRightIcon } from './icons';
 import { UserOverlappingAvatars } from './UserOverlappingAvatars';
+import { ProfileAvatar } from '../general/ProfileAvatar';
 
 export type UserConversationCardProps =
   | {
@@ -155,7 +156,7 @@ export function UserConversationCard(props: UserConversationCardProps) {
       onPress={onPress}
       activeOpacity={0.75}
     >
-      <Image source={{ uri: avatarUri }} style={styles.avatar} />
+      <ProfileAvatar uri={avatarUri} size={AV} style={{ marginRight: UtilityMethods.wp(3) }} />
       <View style={styles.middle}>
         <Text style={styles.name} numberOfLines={1}>
           {name}

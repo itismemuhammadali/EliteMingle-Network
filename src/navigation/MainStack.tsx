@@ -19,6 +19,8 @@ import {
   FeedPostLikersScreen,
   FeedPostCommentersScreen,
   FeedPostSharersScreen,
+  VerifyEmailScreen,
+  CompleteProfileScreen,
 } from '../screens/admin';
 import { UserStack } from './User/UserStack';
 
@@ -26,6 +28,8 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   UserMain: undefined;
+  VerifyEmail: { email?: string; source?: 'forgotPassword' | 'signUp' } | undefined;
+  CompleteProfile: undefined;
   NewsFeed: undefined;
   FeedDetails: { postId: string };
   FeedPostLikers: { postId: string };
@@ -43,7 +47,7 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function MainStack() {
-  const { user, loading } = useAuth();
+  const { user, loading, isEmailVerified, isProfileCompleted } = useAuth();
   const isAdmin = useAppSelector(state => state.admin);
 
   if (loading) {
@@ -68,6 +72,10 @@ export function MainStack() {
           <Stack.Screen name="Main" component={AdminMainScreen} />
           <Stack.Screen name="UserMain" component={UserStack} />
         </>
+      ) : !isEmailVerified ? (
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+      ) : !isProfileCompleted ? (
+        <Stack.Screen name="CompleteProfile" component={CompleteProfileScreen} />
       ) : (
         <>
           <Stack.Screen name="UserMain" component={UserStack} />
@@ -102,6 +110,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
 });
 

@@ -7,6 +7,10 @@ export interface Notification {
   description: string;
   timestamp: string;
   isRead: boolean;
+  targetId?: string;
+  targetType?: 'post' | 'comment' | 'user';
+  userId?: string;
+  postId?: string;
 }
 
 export const MOCK_NOTIFICATIONS: Notification[] = [

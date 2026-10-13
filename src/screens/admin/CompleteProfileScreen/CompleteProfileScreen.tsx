@@ -25,7 +25,6 @@ import FontSize from '../../../utility/FontSize';
 import { Colors } from '../../../constants/colors';
 import { useAuth } from '../../../context/AuthContext';
 import firestore from '@react-native-firebase/firestore';
-import { useUserProfile } from '../../../components/user/UserProfileContext';
 
 type CompleteProfileNavigationProp = NativeStackNavigationProp<
   AuthStackParamList,
@@ -39,8 +38,7 @@ const INTERESTS = [
 
 export function CompleteProfileScreen() {
   const navigation = useNavigation<CompleteProfileNavigationProp>();
-  const { user } = useAuth();
-  const { updateProfile } = useUserProfile();
+  const { user, setIsProfileCompleted } = useAuth();
 
   const [name, setName] = useState(user?.displayName || '');
   const [bio, setBio] = useState('');
@@ -90,10 +88,12 @@ export function CompleteProfileScreen() {
           {
             uid: user.uid,
             fullName: name,
+            displayName: name,
             bio: bio,
             voiceCommands: voiceCommands,
             textToSpeech: textToSpeech,
             simplifiedInterface: simplifiedInterface,
+            interests: selectedInterests,
             selectedInterests: selectedInterests,
             profileCompleted: true,
             updatedAt: firestore.FieldValue.serverTimestamp(),
@@ -106,11 +106,7 @@ export function CompleteProfileScreen() {
         }
       }
 
-      // Update in-memory user profile state
-      updateProfile({
-        displayName: name || 'User',
-        bio: bio,
-      });
+      setIsProfileCompleted(true);
 
       navigation.dispatch(
         CommonActions.reset({

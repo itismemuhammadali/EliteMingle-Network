@@ -37,6 +37,7 @@ export function UserMessageSearchBar({
         paddingHorizontal: UtilityMethods.wp(4),
         paddingVertical: UtilityMethods.hp(1.5),
         marginHorizontal: UtilityMethods.wp(5),
+        marginTop: UtilityMethods.hp(1.5),
         marginBottom: UtilityMethods.hp(1.75),
       },
       input: {

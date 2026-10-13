@@ -1,11 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import {
   useNavigation,
   useRoute,
   type RouteProp,
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import type { UserStackParamList } from '../../../navigation/User/types';
 import MainLayout from '../../../components/general/MainLayout';
 import {
@@ -22,6 +24,10 @@ import { Colors } from '../../../constants/colors';
 import { getPublicUserProfile } from '../../../constants/publicUserProfilesData';
 import type { PublicProfileFriendRow } from '../../../constants/publicUserProfilesData';
 import type { UserProfileGroupRow } from '../../../constants/userProfileGroupsData';
+import type { UserFeedPost } from '../../../constants/userFeedData';
+import { subscribeToPosts } from '../../../services/postService';
+import { subscribeToFriends, sendFriendRequest } from '../../../services/friendService';
+import { subscribeToUserGroups } from '../../../services/groupService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
 
@@ -37,30 +43,215 @@ export function OtherUserProfileScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
   const route = useRoute<RouteProp<UserStackParamList, 'OtherUserProfile'>>();
-  const { userId } = route.params;
+  const { userId = '' } = route.params || {};
+
+  const currentUserId = auth().currentUser?.uid;
 
   const [activeTab, setActiveTab] = useState('posts');
+  const [profileData, setProfileData] = useState<any>(null);
+  const [realPosts, setRealPosts] = useState<UserFeedPost[]>([]);
+  const [realFriends, setRealFriends] = useState<PublicProfileFriendRow[]>([]);
+  const [realGroups, setRealGroups] = useState<UserProfileGroupRow[]>([]);
+  const [friendshipStatus, setFriendshipStatus] = useState<
+    'none' | 'friends' | 'pending_outgoing' | 'pending_incoming'
+  >('none');
+  const [loading, setLoading] = useState(true);
 
-  const profile = useMemo(() => getPublicUserProfile(userId), [userId]);
+  // Load real Firestore profile
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    const unsubUser = firestore()
+      .collection('users')
+      .doc(userId)
+      .onSnapshot(
+        doc => {
+          if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+            setProfileData(doc.data());
+          }
+          setLoading(false);
+        },
+        () => setLoading(false),
+      );
+    return () => unsubUser();
+  }, [userId]);
+
+  // Load user posts
+  useEffect(() => {
+    const unsubPosts = subscribeToPosts(allPosts => {
+      setRealPosts(allPosts.filter(p => p.authorUserId === userId && !p.groupId));
+    });
+    return () => unsubPosts();
+  }, [userId]);
+
+  // Load user friends
+  useEffect(() => {
+    const unsubFriends = subscribeToFriends(userId, friendList => {
+      setRealFriends(
+        friendList.map(f => ({
+          id: f.id,
+          name: f.name,
+          subtitle: f.role || 'Member',
+          avatarUrl: f.avatarUrl,
+          initials: (f.name || 'U')
+            .split(' ')
+            .filter(Boolean)
+            .map(n => n[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase(),
+        })),
+      );
+    });
+    return () => unsubFriends();
+  }, [userId]);
+
+  // Load user groups
+  useEffect(() => {
+    const unsubGroups = subscribeToUserGroups(userId, groupList => {
+      setRealGroups(
+        groupList.map(g => ({
+          id: g.id,
+          name: g.name,
+          roleLabel: 'Group member',
+          imageUrl: g.coverUri || '',
+        })),
+      );
+    });
+    return () => unsubGroups();
+  }, [userId]);
+
+  // Check friendship status with current user
+  useEffect(() => {
+    if (!currentUserId || !userId || currentUserId === userId) return;
+
+    const unsubFriend = firestore()
+      .collection('users')
+      .doc(currentUserId)
+      .collection('friends')
+      .doc(userId)
+      .onSnapshot(doc => {
+        if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+          setFriendshipStatus('friends');
+        } else {
+          firestore()
+            .collection('friend_requests')
+            .where('senderId', '==', currentUserId)
+            .where('receiverId', '==', userId)
+            .where('status', '==', 'pending')
+            .get()
+            .then(outSnap => {
+              if (!outSnap.empty) {
+                setFriendshipStatus('pending_outgoing');
+              } else {
+                firestore()
+                  .collection('friend_requests')
+                  .where('senderId', '==', userId)
+                  .where('receiverId', '==', currentUserId)
+                  .where('status', '==', 'pending')
+                  .get()
+                  .then(inSnap => {
+                    if (!inSnap.empty) {
+                      setFriendshipStatus('pending_incoming');
+                    } else {
+                      setFriendshipStatus('none');
+                    }
+                  })
+                  .catch(() => {});
+              }
+            })
+            .catch(() => {});
+        }
+      });
+
+    return () => unsubFriend();
+  }, [currentUserId, userId]);
+
+  const mockProfile = useMemo(() => getPublicUserProfile(userId), [userId]);
+
+  const displayName =
+    profileData?.fullName ||
+    profileData?.displayName ||
+    profileData?.name ||
+    mockProfile?.displayName ||
+    '';
+
+  const bio =
+    profileData?.bio !== undefined
+      ? profileData.bio
+      : mockProfile?.bio || 'Active Community Member';
+
+  const avatarUri =
+    profileData?.avatarUri ||
+    profileData?.profilePicture ||
+    profileData?.avatarUrl ||
+    mockProfile?.avatarUri ||
+    null;
+
+  const coverUri =
+    profileData?.coverUri ||
+    profileData?.coverPosterUri ||
+    mockProfile?.coverUri ||
+    '';
+
+  const avatarInitials = (displayName || 'U')
+    .split(' ')
+    .filter(Boolean)
+    .map((p: string) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
   const openChat = useCallback(() => {
-    if (!profile) {
+    navigation.navigate('Chat', {
+      peerId: userId,
+      peerName: displayName || 'User',
+      peerAvatarUri: avatarUri || '',
+    });
+  }, [navigation, userId, displayName, avatarUri]);
+
+  const onFriendsPress = useCallback(async () => {
+    if (!currentUserId) {
+      Alert.alert('Sign In Required', 'Please sign in to connect with members.');
       return;
     }
-    navigation.navigate('Chat', {
-      peerId: profile.id,
-      peerName: profile.displayName,
-      peerAvatarUri: profile.avatarUri ?? '',
-    });
-  }, [navigation, profile]);
-
-  const onFriendsPress = useCallback(() => {
-    Alert.alert('Friends', 'Friend request and suggestions will appear here.');
-  }, []);
+    if (friendshipStatus === 'friends') {
+      Alert.alert('Friends', `You and ${displayName || 'this user'} are already friends.`);
+    } else if (friendshipStatus === 'pending_outgoing') {
+      Alert.alert('Request Pending', 'You have already sent a friend request to this user.');
+    } else if (friendshipStatus === 'pending_incoming') {
+      Alert.alert(
+        'Request Received',
+        `${displayName || 'This user'} sent you a friend request. Check your Notifications or Friends tab to accept.`,
+      );
+    } else {
+      Alert.alert(
+        'Add Friend',
+        `Send a friend request to ${displayName || 'this user'}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Send Request',
+            onPress: async () => {
+              try {
+                await sendFriendRequest(currentUserId, userId);
+                setFriendshipStatus('pending_outgoing');
+                Alert.alert('Success', 'Friend request sent.');
+              } catch (err: any) {
+                Alert.alert('Request Failed', err.message || 'Could not send friend request.');
+              }
+            },
+          },
+        ],
+      );
+    }
+  }, [currentUserId, userId, friendshipStatus, displayName]);
 
   const onViewFriend = useCallback(
     (friend: PublicProfileFriendRow) => {
@@ -75,6 +266,10 @@ export function OtherUserProfileScreen() {
     },
     [navigation],
   );
+
+  const postsList = realPosts.length > 0 ? realPosts : mockProfile?.posts || [];
+  const friendsList = realFriends.length > 0 ? realFriends : mockProfile?.friends || [];
+  const groupsList = realGroups.length > 0 ? realGroups : mockProfile?.groups || [];
 
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
@@ -157,7 +352,23 @@ export function OtherUserProfileScreen() {
     }),
   );
 
-  if (!profile) {
+  if (loading) {
+    return (
+      <MainLayout
+        isScrollable={false}
+        includeSafeArea={true}
+        barStyle="dark-content"
+        statusbarBackgrund={Colors.white}
+        bottomColor={Colors.userFeedBackground}
+      >
+        <View style={styles.missing}>
+          <ActivityIndicator size="large" color={Colors.userProfilePurple} />
+        </View>
+      </MainLayout>
+    );
+  }
+
+  if (!displayName) {
     return (
       <MainLayout
         isScrollable={false}
@@ -201,25 +412,23 @@ export function OtherUserProfileScreen() {
           </TouchableOpacity>
           <View style={styles.navTitleWrap} pointerEvents="none">
             <Text style={styles.navTitle} numberOfLines={1}>
-              {profile.displayName}
+              {displayName}
             </Text>
           </View>
         </View>
 
         <UserProfileCoverBlock
-          coverSource={{ uri: profile.coverUri }}
-          avatarSource={
-            profile.avatarUri ? { uri: profile.avatarUri } : null
-          }
-          avatarInitials={profile.avatarInitials}
-          avatarRingColor={profile.avatarRingColor}
+          coverSource={coverUri ? { uri: coverUri } : null}
+          avatarSource={avatarUri ? { uri: avatarUri } : null}
+          avatarInitials={avatarInitials}
+          avatarRingColor={Colors.userProfilePurple}
         />
 
         <View style={styles.body}>
-          <Text style={styles.name}>{profile.displayName}</Text>
-          <Text style={styles.bio}>{profile.bio}</Text>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.bio}>{bio}</Text>
           <Text style={styles.mutual}>
-            {profile.mutualFriendsCount} mutual friends
+            {friendsList.length} Friend{friendsList.length === 1 ? '' : 's'}
           </Text>
 
           <UserPublicProfileActions
@@ -237,18 +446,29 @@ export function OtherUserProfileScreen() {
 
       <View style={styles.feedArea}>
         {activeTab === 'posts' &&
-          profile.posts.map(post => (
-            <UserPostCard key={post.id} post={post} embedded />
+          (postsList.length === 0 ? (
+            <Text
+              style={[
+                styles.missingText,
+                { marginTop: UtilityMethods.hp(3), textAlign: 'center' },
+              ]}
+            >
+              No posts yet.
+            </Text>
+          ) : (
+            postsList.map(post => (
+              <UserPostCard key={post.id} post={post} embedded />
+            ))
           ))}
         {activeTab === 'friends' && (
           <UserPublicFriendsList
-            friends={profile.friends}
+            friends={friendsList}
             onViewProfile={onViewFriend}
           />
         )}
         {activeTab === 'groups' && (
           <UserPublicGroupsList
-            groups={profile.groups}
+            groups={groupsList}
             onViewGroup={onViewGroup}
           />
         )}

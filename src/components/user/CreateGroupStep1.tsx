@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { CreateGroupNameYourGroupIntro } from './CreateGroupNameYourGroupIntro';
+import { CreateGroupAvatarUploadField } from './CreateGroupAvatarUploadField';
 import { CreateGroupCoverUploadField } from './CreateGroupCoverUploadField';
 import { CreateGroupNameField } from './CreateGroupNameField';
 import { CreateGroupDescriptionField } from './CreateGroupDescriptionField';
@@ -13,6 +14,8 @@ export interface CreateGroupStep1Props {
   onChangeGroupDescription: (text: string) => void;
   coverUri: string | undefined;
   onChangeCoverUri: (uri: string | undefined) => void;
+  avatarUri: string | undefined;
+  onChangeAvatarUri: (uri: string | undefined) => void;
 }
 
 export function CreateGroupStep1({
@@ -22,6 +25,8 @@ export function CreateGroupStep1({
   onChangeGroupDescription,
   coverUri,
   onChangeCoverUri,
+  avatarUri,
+  onChangeAvatarUri,
 }: CreateGroupStep1Props) {
   return (
     <ScrollView
@@ -31,6 +36,10 @@ export function CreateGroupStep1({
       showsVerticalScrollIndicator={false}
     >
       <CreateGroupNameYourGroupIntro />
+      <CreateGroupAvatarUploadField
+        avatarUri={avatarUri}
+        onChangeAvatarUri={onChangeAvatarUri}
+      />
       <CreateGroupCoverUploadField
         coverUri={coverUri}
         onChangeCoverUri={onChangeCoverUri}

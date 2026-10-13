@@ -5,7 +5,6 @@ import {
   FilterPills,
   NotificationCard,
 } from '../../../components/admin';
-import { BackArrowIcon } from '../../../components/admin/icons';
 import DoubleTickIcon from '../../../assets/Icons/DoubleTickNoBg.svg';
 import { type Notification } from '../../../constants/notificationData';
 import { subscribeToAdminNotifications } from '../../../services/moderationService';
@@ -13,15 +12,46 @@ import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../../navigation/MainStack';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+import { useLanguage } from '../../../context/LanguageContext';
+
 interface AdminNotificationsScreenProps {
   onBackPress?: () => void;
 }
 
 export function AdminNotificationsScreen({ onBackPress }: AdminNotificationsScreenProps) {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t, language } = useLanguage();
   const [rawNotifications, setRawNotifications] = useState<Notification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const adminUid = auth().currentUser?.uid;
+
+  const handleNotificationPress = (notification: Notification) => {
+    handleMarkAsRead(notification.id);
+
+    if (notification.type === 'report' || notification.targetType === 'post') {
+      const postId = notification.targetId || notification.postId;
+      if (postId) {
+        navigation.navigate('FeedDetails', { postId });
+      }
+      return;
+    }
+
+    if (notification.type === 'user' || notification.targetType === 'user') {
+      const userId = notification.userId || notification.targetId;
+      if (userId) {
+        navigation.navigate('UserDetails', { userId });
+      }
+      return;
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = subscribeToAdminNotifications(list =>
@@ -29,6 +59,27 @@ export function AdminNotificationsScreen({ onBackPress }: AdminNotificationsScre
     );
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!adminUid) return;
+    const unsubMeta = firestore()
+      .collection('users')
+      .doc(adminUid)
+      .collection('meta')
+      .doc('admin_notifications')
+      .onSnapshot(doc => {
+        if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+          const data = doc.data() || {};
+          if (Array.isArray(data.readIds)) {
+            setReadIds(new Set(data.readIds));
+          }
+          if (Array.isArray(data.dismissedIds)) {
+            setDismissedIds(new Set(data.dismissedIds));
+          }
+        }
+      });
+    return () => unsubMeta();
+  }, [adminUid]);
 
   const notifications = useMemo(
     () =>
@@ -51,20 +102,51 @@ export function AdminNotificationsScreen({ onBackPress }: AdminNotificationsScre
   }, [notifications, activeFilter]);
 
   const handleMarkAsRead = (id: string) => {
-    setReadIds(prev => new Set(prev).add(id));
+    const updated = new Set(readIds).add(id);
+    setReadIds(updated);
+    if (adminUid) {
+      firestore()
+        .collection('users')
+        .doc(adminUid)
+        .collection('meta')
+        .doc('admin_notifications')
+        .set({ readIds: Array.from(updated) }, { merge: true })
+        .catch(console.error);
+    }
   };
 
   const handleMarkAllAsRead = () => {
-    setReadIds(new Set(rawNotifications.map(n => n.id)));
+    const allIds = notifications.map(n => n.id);
+    const updated = new Set([...readIds, ...allIds]);
+    setReadIds(updated);
+    if (adminUid) {
+      firestore()
+        .collection('users')
+        .doc(adminUid)
+        .collection('meta')
+        .doc('admin_notifications')
+        .set({ readIds: Array.from(updated) }, { merge: true })
+        .catch(console.error);
+    }
   };
 
   const handleDismiss = (id: string) => {
-    setDismissedIds(prev => new Set(prev).add(id));
+    const updated = new Set(dismissedIds).add(id);
+    setDismissedIds(updated);
+    if (adminUid) {
+      firestore()
+        .collection('users')
+        .doc(adminUid)
+        .collection('meta')
+        .doc('admin_notifications')
+        .set({ dismissedIds: Array.from(updated) }, { merge: true })
+        .catch(console.error);
+    }
   };
 
   const filterOptions = [
-    { id: 'all', label: 'All', count: notifications.length },
-    { id: 'unread', label: 'Unread', count: unreadCount },
+    { id: 'all', label: t('common.all', 'All'), count: notifications.length },
+    { id: 'unread', label: language === 'es' ? 'No leídos' : 'Unread', count: unreadCount },
   ];
 
   return (
@@ -76,20 +158,22 @@ export function AdminNotificationsScreen({ onBackPress }: AdminNotificationsScre
       bottomColor={Colors.adminBackgroundGrey}
     >
       <View style={styles.headerSection}>
-        <View style={styles.backRow}>
-          <TouchableOpacity style={styles.backButton} onPress={onBackPress} activeOpacity={0.7}>
-            <BackArrowIcon size={19.9} color={Colors.primaryPurple} />
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-        </View>
         <View style={styles.headerTop}>
           <View style={styles.titleCol}>
-            <Text style={styles.title}>Notifications</Text>
-            <Text style={styles.subtitle}>{unreadCount} Unread Messages</Text>
+            <Text style={styles.title}>{t('navigation.notifications', 'Notifications')}</Text>
+            <Text style={styles.subtitle}>
+              {unreadCount} {language === 'es' ? 'Mensajes no leídos' : 'Unread Messages'}
+            </Text>
           </View>
-          <View style={styles.iconBox}>
+          <TouchableOpacity
+            style={styles.iconBox}
+            onPress={handleMarkAllAsRead}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Mark all as read"
+          >
             <DoubleTickIcon width={20} height={20} />
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.pillsRow}>
@@ -114,6 +198,7 @@ export function AdminNotificationsScreen({ onBackPress }: AdminNotificationsScre
               notification={notification}
               onDismiss={handleDismiss}
               onMarkAsRead={handleMarkAsRead}
+              onPress={handleNotificationPress}
             />
           ))}
         </View>
@@ -125,20 +210,6 @@ export function AdminNotificationsScreen({ onBackPress }: AdminNotificationsScre
 const styles = StyleSheet.create({
   headerSection: {
     backgroundColor: '#FFFFFF',
-  },
-  backRow: {
-    paddingHorizontal: UtilityMethods.wp(5),
-    paddingTop: UtilityMethods.hp(1),
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: UtilityMethods.wp(1),
-  },
-  backText: {
-    fontSize: FontSize.VALUE(14),
-    fontWeight: '600',
-    color: Colors.primaryPurple,
   },
   headerTop: {
     flexDirection: 'row',

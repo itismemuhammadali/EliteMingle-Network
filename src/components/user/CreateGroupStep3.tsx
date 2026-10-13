@@ -11,6 +11,7 @@ export interface CreateGroupStep3Props {
   groupName: string;
   groupDescription: string;
   coverUri?: string;
+  avatarUri?: string;
   selectedCategoryId: CreateGroupCategoryId | null;
   privacy: CreateGroupPrivacy;
   onChangePrivacy: (value: CreateGroupPrivacy) => void;
@@ -20,6 +21,7 @@ export function CreateGroupStep3({
   groupName,
   groupDescription,
   coverUri,
+  avatarUri,
   selectedCategoryId,
   privacy,
   onChangePrivacy,
@@ -37,6 +39,7 @@ export function CreateGroupStep3({
         groupName={groupName}
         groupDescription={groupDescription}
         coverUri={coverUri}
+        avatarUri={avatarUri}
         selectedCategoryId={selectedCategoryId}
       />
     </ScrollView>

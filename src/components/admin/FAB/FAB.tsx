@@ -45,7 +45,7 @@ export function FAB({ onPress }: FABProps) {
         isDragging.current = false;
         longPressTimer.current = setTimeout(() => {
           isDragging.current = true;
-          pan.setOffset({ x: pan.x._value, y: pan.y._value });
+          pan.setOffset({ x: (pan.x as any)._value, y: (pan.y as any)._value });
           pan.setValue({ x: 0, y: 0 });
         }, 400);
       },
@@ -64,11 +64,11 @@ export function FAB({ onPress }: FABProps) {
           pan.flattenOffset();
           const finalX = Math.max(
             0,
-            Math.min(SCREEN_WIDTH - FAB_SIZE, pan.x._value),
+            Math.min(SCREEN_WIDTH - FAB_SIZE, (pan.x as any)._value),
           );
           const finalY = Math.max(
             0,
-            Math.min(SCREEN_HEIGHT - FAB_SIZE - UtilityMethods.hp(10), pan.y._value),
+            Math.min(SCREEN_HEIGHT - FAB_SIZE - UtilityMethods.hp(10), (pan.y as any)._value),
           );
           pan.setValue({ x: finalX, y: finalY });
           isDragging.current = false;

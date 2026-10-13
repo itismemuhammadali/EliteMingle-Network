@@ -30,9 +30,10 @@ export function BlockedUsersScreen() {
   const [unblockTarget, setUnblockTarget] = useState<BlockedUserMock | null>(
     null,
   );
-  const currentUserId = auth().currentUser?.uid || 'dev_user_123';
+  const currentUserId = auth().currentUser?.uid || '';
 
   useEffect(() => {
+    if (!currentUserId) return;
     const unsubscribe = subscribeToBlockedUsers(currentUserId, setUsers);
     return () => unsubscribe();
   }, [currentUserId]);

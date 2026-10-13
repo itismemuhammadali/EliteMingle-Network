@@ -10,6 +10,9 @@ import {
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { Image } from 'react-native';
+import Svg, { Rect, Circle, Path } from 'react-native-svg';
+import { CameraIcon } from '../../../components/admin/icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MainLayout from '../../../components/general/MainLayout';
@@ -27,7 +30,7 @@ import {
   type UserProfileState,
 } from '../../../constants/userProfileMock';
 import { initialsFromDisplayName } from '../../../utils/userProfileInitials';
-import { uploadAvatar } from '../../../services/postService';
+import { uploadAvatar, uploadCover } from '../../../services/postService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
 
@@ -40,6 +43,7 @@ type FormValues = {
   location: string;
   bio: string;
   avatarUri: string | null;
+  coverUri: string | null;
 };
 
 function profileToForm(p: UserProfileState): FormValues {
@@ -50,6 +54,7 @@ function profileToForm(p: UserProfileState): FormValues {
     location: p.location,
     bio: p.bio,
     avatarUri: p.avatarUri,
+    coverUri: p.coverUri || null,
   };
 }
 
@@ -147,6 +152,58 @@ export function EditProfileScreen() {
         fontWeight: '700',
         color: Colors.textDark,
       },
+      coverSection: {
+        marginBottom: UtilityMethods.hp(2),
+      },
+      coverLabel: {
+        fontSize: FontSize.VALUE(14),
+        fontWeight: '600',
+        color: Colors.textDark,
+        marginBottom: UtilityMethods.hp(0.75),
+      },
+      coverBox: {
+        width: '100%',
+        height: UtilityMethods.hp(16),
+        borderRadius: UtilityMethods.wp(3),
+        borderWidth: 1.5,
+        borderColor: '#DDD6FE',
+        borderStyle: 'dashed',
+        backgroundColor: '#F5F3FF',
+        overflow: 'hidden',
+        position: 'relative',
+      },
+      coverPreview: {
+        width: '100%',
+        height: '100%',
+      },
+      coverPlaceholder: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      coverPlaceholderText: {
+        marginTop: UtilityMethods.hp(0.75),
+        fontSize: FontSize.VALUE(13),
+        fontWeight: '500',
+        color: Colors.userProfilePurple,
+      },
+      coverChangeBadge: {
+        position: 'absolute',
+        right: UtilityMethods.wp(3),
+        bottom: UtilityMethods.hp(1),
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(124, 58, 237, 0.85)',
+        paddingHorizontal: UtilityMethods.wp(3),
+        paddingVertical: UtilityMethods.hp(0.6),
+        borderRadius: UtilityMethods.wp(4),
+      },
+      coverChangeBadgeText: {
+        marginLeft: UtilityMethods.wp(1.5),
+        fontSize: FontSize.VALUE(12),
+        fontWeight: '600',
+        color: Colors.white,
+      },
     }),
   );
 
@@ -191,14 +248,14 @@ export function EditProfileScreen() {
           onSubmit={async values => {
             // Declared here so it's available for updateProfile after the try.
             let savedAvatar = values.avatarUri;
+            let savedCover = values.coverUri;
             try {
               const authModule = require('@react-native-firebase/auth').default;
               const firestoreModule = require('@react-native-firebase/firestore').default;
               const currentUser = authModule().currentUser;
-              // Upload a newly-picked (local) avatar to Storage so it shows in
-              // the feed and on other devices; keep remote urls as-is.
               if (currentUser?.uid) {
                 savedAvatar = await uploadAvatar(currentUser.uid, values.avatarUri);
+                savedCover = await uploadCover(currentUser.uid, values.coverUri);
               }
               if (currentUser?.uid) {
                 await firestoreModule().collection('users').doc(currentUser.uid).set(
@@ -209,6 +266,7 @@ export function EditProfileScreen() {
                     location: values.location.trim(),
                     bio: values.bio,
                     avatarUri: savedAvatar,
+                    coverUri: savedCover || '',
                     updatedAt: firestoreModule.FieldValue.serverTimestamp(),
                   },
                   { merge: true }
@@ -227,6 +285,7 @@ export function EditProfileScreen() {
               location: values.location.trim(),
               bio: values.bio,
               avatarUri: savedAvatar,
+              coverUri: savedCover || '',
             });
             navigation.goBack();
           }}
@@ -259,8 +318,61 @@ export function EditProfileScreen() {
                 },
               );
             };
+            const pickCover = () => {
+              launchImageLibrary(
+                { mediaType: 'photo', selectionLimit: 1 },
+                response => {
+                  if (response.didCancel || response.errorCode) {
+                    return;
+                  }
+                  const uri = response.assets?.[0]?.uri;
+                  if (uri) {
+                    setFieldValue('coverUri', uri);
+                  }
+                },
+              );
+            };
             return (
               <View style={styles.body}>
+                <View style={styles.coverSection}>
+                  <Text style={styles.coverLabel}>Profile Cover Poster</Text>
+                  <TouchableOpacity
+                    style={styles.coverBox}
+                    onPress={pickCover}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose cover poster"
+                  >
+                    {values.coverUri ? (
+                      <Image
+                        source={{ uri: values.coverUri }}
+                        style={styles.coverPreview}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.coverPlaceholder}>
+                        <Svg width={UtilityMethods.wp(8)} height={UtilityMethods.wp(8)} viewBox="0 0 24 24" fill="none">
+                          <Rect x="3" y="3" width="18" height="18" rx="3" stroke={Colors.userProfilePurple} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <Circle cx="8.5" cy="8.5" r="1.5" stroke={Colors.userProfilePurple} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          <Path d="M21 15L16 10L5 21" stroke={Colors.userProfilePurple} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                        <Text style={styles.coverPlaceholderText}>
+                          Tap to select a cover poster
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.coverChangeBadge}>
+                      <CameraIcon
+                        size={UtilityMethods.wp(3.5)}
+                        color={Colors.white}
+                      />
+                      <Text style={styles.coverChangeBadgeText}>
+                        {values.coverUri ? 'Change Poster' : 'Add Poster'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
                 <UserEditProfileAvatarSection
                   initials={initials}
                   imageUri={values.avatarUri}

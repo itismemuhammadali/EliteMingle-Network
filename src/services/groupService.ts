@@ -1,5 +1,9 @@
 import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
+import { Platform } from 'react-native';
 import type { UserGroupMock } from '../constants/userGroupsData';
+import { getUserGroupDetailById } from '../constants/userGroupsData';
+import { formatStorageUrl } from './postService';
 
 /**
  * Groups live in a top-level `groups` collection.
@@ -17,6 +21,7 @@ export interface CreateGroupParams {
   category?: string;
   privacy?: 'public' | 'private';
   coverUri?: string;
+  avatarUri?: string;
   ownerId: string;
 }
 
@@ -41,6 +46,100 @@ const pickColor = (seed: string): string => {
 };
 
 /**
+ * Upload a locally-picked group cover to Firebase Storage and return its download URL.
+ */
+export const uploadGroupCover = async (
+  groupId: string,
+  localUri?: string | null,
+  ownerId?: string,
+): Promise<string> => {
+  if (!localUri || localUri.startsWith('http')) return localUri || '';
+  const cleanId = (groupId || 'group').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanOwnerId = (ownerId || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const metadata = { contentType: 'image/jpeg' };
+
+  const uploadUri =
+    Platform.OS === 'android' && localUri.startsWith('file://')
+      ? localUri.replace('file://', '')
+      : localUri;
+
+  const tryUpload = async (storagePath: string): Promise<string> => {
+    const ref = storage().ref(storagePath);
+    if (localUri.startsWith('data:')) {
+      const base64 = localUri.split(',')[1] || localUri;
+      await ref.putString(base64, 'base64', metadata);
+    } else {
+      await ref.putFile(uploadUri, metadata);
+    }
+    const raw = await ref.getDownloadURL();
+    return formatStorageUrl(raw) || raw;
+  };
+
+  try {
+    return await tryUpload(`groups/${cleanId}/cover_${Date.now()}.jpg`);
+  } catch (err) {
+    console.warn('Group cover upload to groups/ failed, trying fallback path:', err);
+    try {
+      return await tryUpload(`posts/${cleanOwnerId}/${cleanId}/cover_${Date.now()}.jpg`);
+    } catch (errFallback) {
+      try {
+        return await tryUpload(`covers/${cleanOwnerId}/group_${cleanId}_cover_${Date.now()}.jpg`);
+      } catch (finalErr) {
+        console.warn('All upload paths failed for group cover, keeping local uri:', finalErr);
+        return localUri;
+      }
+    }
+  }
+};
+
+/**
+ * Upload a locally-picked group avatar to Firebase Storage and return its download URL.
+ */
+export const uploadGroupAvatar = async (
+  groupId: string,
+  localUri?: string | null,
+  ownerId?: string,
+): Promise<string> => {
+  if (!localUri || localUri.startsWith('http')) return localUri || '';
+  const cleanId = (groupId || 'group').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanOwnerId = (ownerId || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const metadata = { contentType: 'image/jpeg' };
+
+  const uploadUri =
+    Platform.OS === 'android' && localUri.startsWith('file://')
+      ? localUri.replace('file://', '')
+      : localUri;
+
+  const tryUpload = async (storagePath: string): Promise<string> => {
+    const ref = storage().ref(storagePath);
+    if (localUri.startsWith('data:')) {
+      const base64 = localUri.split(',')[1] || localUri;
+      await ref.putString(base64, 'base64', metadata);
+    } else {
+      await ref.putFile(uploadUri, metadata);
+    }
+    const raw = await ref.getDownloadURL();
+    return formatStorageUrl(raw) || raw;
+  };
+
+  try {
+    return await tryUpload(`groups/${cleanId}/avatar_${Date.now()}.jpg`);
+  } catch (err) {
+    console.warn('Group avatar upload to groups/ failed, trying fallback path:', err);
+    try {
+      return await tryUpload(`avatars/${cleanOwnerId}/group_${cleanId}_avatar_${Date.now()}.jpg`);
+    } catch (errFallback) {
+      try {
+        return await tryUpload(`posts/${cleanOwnerId}/${cleanId}/avatar_${Date.now()}.jpg`);
+      } catch (finalErr) {
+        console.warn('All upload paths failed for group avatar, keeping local uri:', finalErr);
+        return localUri;
+      }
+    }
+  }
+};
+
+/**
  * Create a new group. The owner is automatically the first member.
  * Returns the new group id.
  */
@@ -51,6 +150,7 @@ export const createGroup = async (params: CreateGroupParams): Promise<string> =>
     category = 'other',
     privacy = 'public',
     coverUri = '',
+    avatarUri = '',
     ownerId,
   } = params;
 
@@ -61,13 +161,24 @@ export const createGroup = async (params: CreateGroupParams): Promise<string> =>
   const ref = firestore().collection('groups').doc();
   const id = ref.id;
 
+  let finalCoverUri = coverUri;
+  if (coverUri && !coverUri.startsWith('http')) {
+    finalCoverUri = await uploadGroupCover(id, coverUri, ownerId);
+  }
+
+  let finalAvatarUri = avatarUri;
+  if (avatarUri && !avatarUri.startsWith('http')) {
+    finalAvatarUri = await uploadGroupAvatar(id, avatarUri, ownerId);
+  }
+
   await ref.set({
     id,
     name: trimmed,
     description: description.trim(),
     category,
     privacy,
-    coverUri,
+    coverUri: finalCoverUri || '',
+    avatarUri: finalAvatarUri || '',
     ownerId,
     members: [ownerId],
     memberCount: 1,
@@ -122,6 +233,32 @@ export const subscribeToGroupDetail = (
     .onSnapshot(
       async snap => {
         if (!snap || !docExists(snap)) {
+          const fallback = getUserGroupDetailById(groupId);
+          if (fallback) {
+            const fbCover =
+              formatStorageUrl(fallback.coverUri) || fallback.coverUri || '';
+            const fbAvatar =
+              formatStorageUrl(fallback.avatarUri) || fallback.avatarUri || '';
+            onUpdate({
+              id: fallback.id,
+              name: fallback.name,
+              description: fallback.description,
+              coverUri: fbCover,
+              avatarUri: fbAvatar || fbCover,
+              memberCount: fallback.memberCount,
+              iconBackgroundColor: fallback.iconBackgroundColor,
+              ownerId: '',
+              privacy: 'public',
+              isMember: false,
+              members: fallback.members.map(m => ({
+                id: m.id,
+                name: m.name,
+                role: m.role,
+                avatarUri: m.avatarUri,
+              })),
+            });
+            return;
+          }
           onUpdate(null);
           return;
         }
@@ -141,19 +278,27 @@ export const subscribeToGroupDetail = (
                 | 'Admin'
                 | 'Member',
               avatarUri:
-                rawAvatar && String(rawAvatar).startsWith('http')
+                rawAvatar && (String(rawAvatar).startsWith('http') || String(rawAvatar).startsWith('file'))
                   ? rawAvatar
-                  : 'https://i.pravatar.cc/150?img=12',
+                  : '',
             };
           }),
         );
+
+        const rawCover =
+          x.coverUri || x.coverUrl || x.coverImage || x.cover || x.imageUrl || '';
+        const rawAvatar =
+          x.avatarUri || x.avatarUrl || x.avatar || x.iconUri || '';
+        const formattedCover = formatStorageUrl(rawCover) || rawCover || '';
+        const formattedAvatar =
+          formatStorageUrl(rawAvatar) || rawAvatar || formattedCover || '';
 
         onUpdate({
           id: snap.id,
           name: x.name || 'Group',
           description: x.description || '',
-          coverUri: x.coverUri || '',
-          avatarUri: x.coverUri || '',
+          coverUri: formattedCover,
+          avatarUri: formattedAvatar,
           memberCount: x.memberCount || memberIds.length,
           iconBackgroundColor: x.iconBackgroundColor || '#90CAF9',
           ownerId: x.ownerId || '',
@@ -168,12 +313,18 @@ export const subscribeToGroupDetail = (
 
 /** Map a group doc to the grid-card shape the Groups screen renders. */
 const toGroupCard = (doc: any): UserGroupMock => {
-  const x = doc.data();
+  const x = doc.data() || {};
+  const rawCover =
+    x.coverUri || x.coverUrl || x.coverImage || x.cover || x.imageUrl || '';
+  const rawAvatar =
+    x.avatarUri || x.avatarUrl || x.avatar || x.iconUri || '';
   return {
     id: doc.id,
     name: x.name || 'Group',
     memberCount: x.memberCount || 1,
     iconBackgroundColor: x.iconBackgroundColor || '#90CAF9',
+    coverUri: formatStorageUrl(rawCover) || rawCover || '',
+    avatarUri: formatStorageUrl(rawAvatar) || rawAvatar || '',
   };
 };
 

@@ -17,6 +17,7 @@ export function UserGroupsSectionHeader({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        marginTop: UtilityMethods.hp(1.5),
         marginBottom: UtilityMethods.hp(2),
       },
       title: {

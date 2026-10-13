@@ -1,7 +1,10 @@
 import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
+import { Platform } from 'react-native';
 import type { UserMessageListItem } from '../constants/userMessagesData';
 import type { ChatMessage } from '../screens/user/ChatScreen/ChatScreen';
 import { createNotification } from './notificationService';
+import { setCachedAudioUri } from './audioCacheService';
 
 export interface ParticipantProfile {
   name: string;
@@ -34,6 +37,7 @@ export interface MessageDocument {
   senderAvatar?: string;
   text: string;
   mediaUrl?: string;
+  mediaType?: 'image' | 'audio';
   createdAt: FirebaseFirestoreTypes.Timestamp | ReturnType<typeof firestore.FieldValue.serverTimestamp>;
   readBy?: string[];
 }
@@ -82,8 +86,9 @@ export const getOrCreateDirectConversation = async (
       const currentUserExists = typeof (currentUserDoc as any).exists === 'function' ? currentUserDoc.exists() : currentUserDoc.exists;
       if (currentUserExists) {
         const d = currentUserDoc.data();
+        const resolved = d?.fullName || d?.displayName || d?.name;
         currentUserProfile = {
-          name: d?.fullName || d?.displayName || d?.name || 'User',
+          name: (resolved && resolved !== 'Anonymous User') ? resolved : 'User',
           avatarUri: d?.profilePicture || d?.avatarUri || '',
         };
       }
@@ -91,8 +96,18 @@ export const getOrCreateDirectConversation = async (
       const peerExists = typeof (peerDoc as any).exists === 'function' ? peerDoc.exists() : peerDoc.exists;
       if (peerExists) {
         const d = peerDoc.data();
+        const candidateName =
+          peerDetails?.name && peerDetails.name !== 'Anonymous User' ? peerDetails.name : '';
+        const docName = d?.fullName || d?.displayName || d?.name;
+        const validDocName = docName && docName !== 'Anonymous User' ? docName : '';
+        const emailFallback = d?.email ? d.email.split('@')[0] : '';
+        const resolved =
+          candidateName ||
+          validDocName ||
+          (emailFallback ? emailFallback.charAt(0).toUpperCase() + emailFallback.slice(1) : '') ||
+          'User';
         peerProfile = {
-          name: peerDetails?.name || d?.fullName || d?.displayName || d?.name || 'User',
+          name: resolved,
           avatarUri: peerDetails?.avatarUri || d?.profilePicture || d?.avatarUri || '',
         };
       }
@@ -117,6 +132,34 @@ export const getOrCreateDirectConversation = async (
     };
 
     await convRef.set(newConversation, { merge: true });
+  } else {
+    try {
+      const data = convSnap.data() as ConversationDocument;
+      const peerProf = data.participantProfiles?.[peerId];
+      if (!peerProf?.name || peerProf.name === 'Anonymous User' || peerProf.name === 'User') {
+        const peerDoc = await firestore().collection('users').doc(peerId).get();
+        const peerDocExists = typeof (peerDoc as any).exists === 'function' ? peerDoc.exists() : peerDoc.exists;
+        if (peerDocExists) {
+          const d = peerDoc.data();
+          const candidateName =
+            peerDetails?.name && peerDetails.name !== 'Anonymous User' ? peerDetails.name : '';
+          const docName = d?.fullName || d?.displayName || d?.name;
+          const validDocName = docName && docName !== 'Anonymous User' ? docName : '';
+          const emailFallback = d?.email ? d.email.split('@')[0] : '';
+          const resolved =
+            candidateName ||
+            validDocName ||
+            (emailFallback ? emailFallback.charAt(0).toUpperCase() + emailFallback.slice(1) : '');
+          if (resolved && resolved !== 'Anonymous User') {
+            await convRef.update({
+              [`participantProfiles.${peerId}.name`]: resolved,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      // Non-blocking heal
+    }
   }
 
   return conversationId;
@@ -167,11 +210,13 @@ export const sendMessage = async ({
   senderId,
   text,
   mediaUrl,
+  mediaType,
 }: {
   conversationId: string;
   senderId: string;
   text: string;
   mediaUrl?: string;
+  mediaType?: 'image' | 'audio';
 }): Promise<string> => {
   if (!conversationId || !senderId) {
     throw new Error('conversationId and senderId are required.');
@@ -192,6 +237,7 @@ export const sendMessage = async ({
     senderId,
     text: text.trim(),
     mediaUrl: mediaUrl || null,
+    mediaType: mediaType || (mediaUrl ? 'image' : null),
     createdAt: timestamp,
     readBy: [senderId],
   };
@@ -236,6 +282,63 @@ export const sendMessage = async ({
   });
 
   return msgId;
+};
+
+/**
+ * Upload a locally selected chat image to Firebase Storage and return its remote URL.
+ */
+export const uploadChatImage = async (
+  conversationId: string,
+  localUri: string,
+): Promise<string> => {
+  if (!localUri || localUri.startsWith('http')) return localUri || '';
+  try {
+    const cleanConvId = (conversationId || 'chat').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const path = `chat/${cleanConvId}/image_${Date.now()}.jpg`;
+    const ref = storage().ref(path);
+    const metadata = { contentType: 'image/jpeg' };
+
+    const uploadUri =
+      Platform.OS === 'android' && localUri.startsWith('file://')
+        ? localUri.replace('file://', '')
+        : localUri;
+    await ref.putFile(uploadUri, metadata);
+
+    const raw = await ref.getDownloadURL();
+    return raw;
+  } catch (err) {
+    console.warn('Chat image upload failed:', err);
+    return localUri;
+  }
+};
+
+/**
+ * Upload a recorded chat audio voice memo to Firebase Storage and return its remote URL.
+ */
+export const uploadChatAudio = async (
+  conversationId: string,
+  localUri: string,
+): Promise<string> => {
+  if (!localUri || localUri.startsWith('http')) return localUri || '';
+  try {
+    const cleanConvId = (conversationId || 'chat').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const path = `chat/${cleanConvId}/audio_${Date.now()}.m4a`;
+    const ref = storage().ref(path);
+    const metadata = { contentType: 'audio/m4a' };
+
+    const uploadUri =
+      Platform.OS === 'android' && localUri.startsWith('file://')
+        ? localUri.replace('file://', '')
+        : localUri;
+    await ref.putFile(uploadUri, metadata);
+
+    const raw = await ref.getDownloadURL();
+    setCachedAudioUri(raw, localUri);
+    return raw;
+  } catch (err) {
+    console.warn('Chat audio upload failed:', err);
+    return localUri;
+  }
 };
 
 /**
@@ -320,7 +423,7 @@ export const subscribeToConversations = (
             name: peerProfile?.name || 'User',
             preview: data.lastMessage?.text || 'Start a conversation',
             time: timeStr,
-            avatarUri: peerProfile?.avatarUri || 'https://i.pravatar.cc/150?img=12',
+            avatarUri: peerProfile?.avatarUri || '',
             unreadCount: unreadCount > 0 ? unreadCount : undefined,
           };
         });
@@ -371,11 +474,24 @@ export const subscribeToMessages = (
             });
           }
 
+          const mediaType =
+            data.mediaType ||
+            (data.mediaUrl
+              ? data.mediaUrl.includes('.m4a') ||
+                data.mediaUrl.includes('.mp3') ||
+                data.mediaUrl.includes('.aac') ||
+                data.text === 'Sent a voice memo'
+                ? 'audio'
+                : 'image'
+              : undefined);
+
           return {
             id: doc.id,
             text: data.text || '',
             time: timeStr,
             isOutgoing: data.senderId === currentUserId,
+            mediaUrl: data.mediaUrl || undefined,
+            mediaType,
           };
         });
 
@@ -404,11 +520,22 @@ export const subscribeToAllUsers = (
         }
 
         const usersList: RegisteredUser[] = snapshot.docs
-          .filter(doc => doc.id !== currentUserId)
+          .filter(doc => {
+            if (doc.id === currentUserId) return false;
+            const data = doc.data();
+            const role = (data.role || '').toLowerCase();
+            return role !== 'admin';
+          })
           .map(doc => {
             const d = doc.data();
-            const name = d.fullName || d.displayName || d.name || 'User';
-            const avatarUri = d.profilePicture || d.avatarUri || d.avatarUrl || 'https://i.pravatar.cc/150?img=12';
+            const rawName = d.fullName || d.displayName || d.name;
+            const name =
+              rawName && rawName !== 'Anonymous User'
+                ? rawName
+                : d.email
+                ? d.email.split('@')[0].charAt(0).toUpperCase() + d.email.split('@')[0].slice(1)
+                : 'User';
+            const avatarUri = d.profilePicture || d.avatarUri || d.avatarUrl || '';
             return {
               id: doc.id,
               name,
@@ -423,4 +550,92 @@ export const subscribeToAllUsers = (
         console.error('Real-time users snapshot error:', error);
       },
     );
+};
+
+/**
+ * 7. Fetch the most recent direct conversation for voice command deep linking.
+ */
+export const getLatestDirectConversation = async (
+  userId: string,
+): Promise<{
+  conversationId: string;
+  peerId: string;
+  peerName: string;
+  peerAvatarUri: string;
+} | null> => {
+  if (!userId) return null;
+  try {
+    const snap = await firestore()
+      .collection('conversations')
+      .where('participants', 'array-contains', userId)
+      .get();
+    if (!snap || snap.empty) return null;
+
+    const directDocs = snap.docs
+      .map(d => ({ id: d.id, data: d.data() as ConversationDocument }))
+      .filter(d => d.data.type === 'direct' || !d.data.type)
+      .sort((a, b) => {
+        const at = (a.data.updatedAt as any)?.seconds || 0;
+        const bt = (b.data.updatedAt as any)?.seconds || 0;
+        return bt - at;
+      });
+
+    if (directDocs.length === 0) return null;
+    const latest = directDocs[0];
+    const peerId = latest.data.participants?.find(p => p !== userId) || userId;
+    const peerProfile = latest.data.participantProfiles?.[peerId];
+
+    return {
+      conversationId: latest.id,
+      peerId,
+      peerName: peerProfile?.name || 'User',
+      peerAvatarUri: peerProfile?.avatarUri || '',
+    };
+  } catch (err) {
+    console.warn('getLatestDirectConversation error:', err);
+    return null;
+  }
+};
+
+/**
+ * 8. Fetch the most recent group conversation for voice command deep linking.
+ */
+export const getLatestGroupConversation = async (
+  userId: string,
+): Promise<{
+  conversationId: string;
+  groupName: string;
+  groupAvatar: string;
+  memberLabel: string;
+} | null> => {
+  if (!userId) return null;
+  try {
+    const snap = await firestore()
+      .collection('conversations')
+      .where('participants', 'array-contains', userId)
+      .get();
+    if (!snap || snap.empty) return null;
+
+    const groupDocs = snap.docs
+      .map(d => ({ id: d.id, data: d.data() as ConversationDocument }))
+      .filter(d => d.data.type === 'group')
+      .sort((a, b) => {
+        const at = (a.data.updatedAt as any)?.seconds || 0;
+        const bt = (b.data.updatedAt as any)?.seconds || 0;
+        return bt - at;
+      });
+
+    if (groupDocs.length === 0) return null;
+    const latest = groupDocs[0];
+
+    return {
+      conversationId: latest.id,
+      groupName: latest.data.groupName || 'Group Chat',
+      groupAvatar: latest.data.groupAvatar || '',
+      memberLabel: latest.data.memberLabel || `${latest.data.participants?.length || 0} members`,
+    };
+  } catch (err) {
+    console.warn('getLatestGroupConversation error:', err);
+    return null;
+  }
 };

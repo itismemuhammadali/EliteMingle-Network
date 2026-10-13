@@ -14,9 +14,16 @@ import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { useUsersList } from '../../../context/UsersListContext';
 import { subscribeToPosts } from '../../../services/postService';
+import { subscribeToAdminNotifications } from '../../../services/moderationService';
 import type { NewsPost } from '../../../components/admin/NewsPostCard';
+import { useLanguage } from '../../../context/LanguageContext';
+import {
+  getSyncTranslatedContent,
+  getLocalizedStatus,
+} from '../../../services/databaseTranslationService';
 import { useEffect, useState } from 'react';
 
 type AdminHomeNavigationProp = NativeStackNavigationProp<
@@ -32,11 +39,54 @@ export function AdminHomeScreen({
   onNotificationPress,
 }: AdminHomeScreenProps) {
   const navigation = useNavigation<AdminHomeNavigationProp>();
+  const { t, language } = useLanguage();
   const { users } = useUsersList();
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.status === 'active').length;
   const adminName = auth().currentUser?.displayName || 'Admin';
   const [newsPosts, setNewsPosts] = useState<NewsPost[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const adminUid = auth().currentUser?.uid;
+    let readSet = new Set<string>();
+    let dismissedSet = new Set<string>();
+    let rawList: any[] = [];
+
+    const recompute = () => {
+      const count = rawList.filter(
+        n => !dismissedSet.has(n.id) && !readSet.has(n.id),
+      ).length;
+      setUnreadCount(count);
+    };
+
+    const unsubAdmin = subscribeToAdminNotifications(list => {
+      rawList = (list as any[]) || [];
+      recompute();
+    });
+
+    let unsubMeta = () => {};
+    if (adminUid) {
+      unsubMeta = firestore()
+        .collection('users')
+        .doc(adminUid)
+        .collection('meta')
+        .doc('admin_notifications')
+        .onSnapshot(doc => {
+          if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+            const data = doc.data() || {};
+            if (Array.isArray(data.readIds)) readSet = new Set(data.readIds);
+            if (Array.isArray(data.dismissedIds)) dismissedSet = new Set(data.dismissedIds);
+          }
+          recompute();
+        });
+    }
+
+    return () => {
+      unsubAdmin();
+      unsubMeta();
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToPosts(all => {
@@ -48,9 +98,9 @@ export function AdminHomeScreen({
             id: p.id,
             userId: p.authorUserId,
             userName: p.userName,
-            status: 'Active',
+            status: getLocalizedStatus('Active'),
             timeAgo: p.timeAgo,
-            content: p.content,
+            content: getSyncTranslatedContent(p.content, language),
             likes: p.reactions,
             comments: p.comments,
             shares: p.shares,
@@ -62,7 +112,7 @@ export function AdminHomeScreen({
       );
     });
     return () => unsubscribe();
-  }, []);
+  }, [language]);
 
   return (
     <MainLayout
@@ -77,7 +127,9 @@ export function AdminHomeScreen({
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerTitle}>{adminName}</Text>
-            <Text style={styles.headerSubtitle}>Welcome Back, Admin</Text>
+            <Text style={styles.headerSubtitle}>
+              {language === 'es' ? 'Bienvenido Administrador' : 'Welcome Back, Admin'}
+            </Text>
           </View>
           <TouchableOpacity
             onPress={onNotificationPress}
@@ -88,7 +140,7 @@ export function AdminHomeScreen({
               size={UtilityMethods.wp(6)}
               color={Colors.adminInactiveGrey}
             />
-            <View style={styles.badgeOnBell} />
+            {unreadCount > 0 && <View style={styles.badgeOnBell} />}
           </TouchableOpacity>
         </View>
         <View style={styles.headerBorder} />
@@ -99,14 +151,14 @@ export function AdminHomeScreen({
           <StatCard
             icon={<UsersIcon size={UtilityMethods.wp(6)} color="#FFFFFF" />}
             value={totalUsers.toLocaleString()}
-            label="Total Users"
+            label={t('adminHome.totalUsers', 'Total Users')}
             change=""
             iconBgColor={Colors.adminStatsBlue}
           />
           <StatCard
             icon={<AnalyticsIcon width={UtilityMethods.wp(11)} height={UtilityMethods.wp(11)} />}
             value={activeUsers.toLocaleString()}
-            label="Active Users"
+            label={t('adminHome.activeUsers', 'Active Members')}
             change=""
           />
         </View>

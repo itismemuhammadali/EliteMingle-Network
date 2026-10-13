@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Video from 'react-native-video';
@@ -21,8 +22,12 @@ import PostThumbUp from '../../assets/Icons/blackLike.svg';
 import BlackLikeIcon from '../../assets/Icons/blackLike.svg';
 import PurpleLikeIcon from '../../assets/Icons/purpleLike.svg';
 import DotsVertical from '../../assets/Icons/profile/dotsVertical.svg';
+import { UserTabProfileIcon } from './icons/UserTabProfileIcon';
 import { PostCardOverflowMenu } from './PostCardOverflowMenu';
 import { PostCardShareMenu } from './PostCardShareMenu';
+import { ReportPostModal } from './ReportPostModal';
+import { VoiceMemoPlayer } from './VoiceMemoPlayer';
+import { PostTtsButton } from './PostTtsButton';
 import { useAppSelector } from '../../redux/hooks';
 import {
   toggleLike as toggleLikeService,
@@ -94,13 +99,14 @@ function initials(name?: string | null): string {
     .toUpperCase() || 'U';
 }
 
-export function UserPostCard({ post, embedded }: UserPostCardProps) {
+function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
   const simplifiedUi = useAppSelector(s => s.simplifiedUi);
+  const ttsEnabled = useAppSelector(s => s.ttsEnabled);
   const [liked, setLiked] = useState(false);
   const [reactionCount, setReactionCount] = useState(post.reactions);
-  const currentUserId = auth().currentUser?.uid || 'dev_user_123';
+  const currentUserId = auth().currentUser?.uid || '';
 
   // Keep the displayed count in sync with the authoritative value from Firestore.
   useEffect(() => {
@@ -109,16 +115,35 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
 
   // Track (in real-time) whether the current user has liked this post.
   useEffect(() => {
+    if (!currentUserId) return;
     const unsubscribe = subscribeToPostLike(post.id, currentUserId, setLiked);
     return () => unsubscribe();
   }, [post.id, currentUserId]);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const isAudio = post.mediaType === 'audio' || !!post.audioUrl;
   const isVideo = post.mediaType === 'video' || !!post.videoUrl;
-  const mediaUrl = post.videoUrl || post.mediaUrl || post.imageUrl || post.localUri;
-  const hasValidImage = !isVideo && !!mediaUrl && !imgError;
-  const hasValidVideo = isVideo && !!mediaUrl && !imgError;
+  const mediaUrl = post.audioUrl || post.videoUrl || post.mediaUrl || post.imageUrl || post.localUri;
+  const hasValidAudio = isAudio && !!mediaUrl;
+  const hasValidImage = !isVideo && !isAudio && !!mediaUrl && !imgError;
+  const hasValidVideo = isVideo && !isAudio && !!mediaUrl && !imgError;
+
+  // Memoize image/video/avatar source objects so card re-renders never cause media to reload
+  const avatarSource = useMemo(
+    () => (post.avatarUrl ? { uri: post.avatarUrl } : undefined),
+    [post.avatarUrl],
+  );
+  const imageSource = useMemo(
+    () => (mediaUrl ? { uri: mediaUrl } : undefined),
+    [mediaUrl],
+  );
+  const videoSource = useMemo(
+    () => (mediaUrl ? { uri: mediaUrl } : undefined),
+    [mediaUrl],
+  );
 
   const heartColor = useMemo(
     () => (liked ? LIKE_RED : ACTION_MUTED),
@@ -291,6 +316,10 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
   );
 
   const toggleLike = () => {
+    if (!currentUserId) {
+      Alert.alert('Sign In Required', 'Please sign in to react to posts.');
+      return;
+    }
     const next = !liked;
     // Optimistic UI — reconciled by the Firestore snapshots above.
     setLiked(next);
@@ -305,6 +334,10 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
 
   const simpIcon = UtilityMethods.wp(5);
 
+  if (isHidden) {
+    return null;
+  }
+
   return (
     <>
       <View style={[styles.card, embedded && styles.cardEmbedded]}>
@@ -315,14 +348,14 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
             accessibilityRole="button"
             accessibilityLabel={`${post.userName} profile`}
           >
-            {post.avatarUrl ? (
+            {post.avatarUrl && avatarSource ? (
               <Image
-                source={{ uri: post.avatarUrl }}
+                source={avatarSource}
                 style={styles.avatarImage}
               />
             ) : (
-              <View style={[styles.avatar, { backgroundColor: post.avatarColor }]}>
-                <Text style={styles.avatarText}>{initials(post.userName)}</Text>
+              <View style={[styles.avatar, { backgroundColor: post.avatarColor || Colors.userProfilePurple, alignItems: 'center', justifyContent: 'center' }]}>
+                <UserTabProfileIcon size={UtilityMethods.wp(5.5)} color={Colors.white} />
               </View>
             )}
           </TouchableOpacity>
@@ -358,9 +391,19 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
 
         <Text style={styles.content}>{post.content}</Text>
 
-        {hasValidVideo ? (
+        {ttsEnabled && !!post.content && (
+          <PostTtsButton
+            postId={post.id}
+            authorName={post.userName}
+            content={post.content}
+          />
+        )}
+
+        {hasValidAudio ? (
+          <VoiceMemoPlayer audioUri={mediaUrl} />
+        ) : hasValidVideo && videoSource ? (
           <Video
-            source={{ uri: mediaUrl }}
+            source={videoSource}
             style={styles.postImage}
             resizeMode="cover"
             controls
@@ -371,9 +414,9 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
               setImgError(true);
             }}
           />
-        ) : hasValidImage ? (
+        ) : hasValidImage && imageSource ? (
           <Image
-            source={{ uri: mediaUrl }}
+            source={imageSource}
             style={styles.postImage}
             resizeMode="cover"
             onError={(e) => {
@@ -490,6 +533,17 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
         postId={post.id}
         authorId={post.authorUserId}
         authorName={post.userName}
+        postContent={post.content}
+        onReportPress={() => setReportOpen(true)}
+      />
+      <ReportPostModal
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        postId={post.id}
+        authorId={post.authorUserId}
+        authorName={post.userName}
+        postContent={post.content}
+        onReportSuccess={() => setIsHidden(true)}
       />
       <PostCardShareMenu
         visible={shareOpen}
@@ -499,3 +553,25 @@ export function UserPostCard({ post, embedded }: UserPostCardProps) {
     </>
   );
 }
+
+export const UserPostCard = React.memo(
+  UserPostCardComponent,
+  (prevProps, nextProps) => {
+    if (prevProps.embedded !== nextProps.embedded) return false;
+    const p = prevProps.post;
+    const n = nextProps.post;
+    if (p === n) return true;
+    return (
+      p.id === n.id &&
+      p.reactions === n.reactions &&
+      p.comments === n.comments &&
+      p.shares === n.shares &&
+      p.content === n.content &&
+      p.mediaUrl === n.mediaUrl &&
+      p.mediaType === n.mediaType &&
+      p.feeling === n.feeling &&
+      p.userName === n.userName &&
+      p.avatarUrl === n.avatarUrl
+    );
+  },
+);

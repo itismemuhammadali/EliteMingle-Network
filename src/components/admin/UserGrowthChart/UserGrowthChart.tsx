@@ -4,6 +4,7 @@ import { LineChart } from 'react-native-gifted-charts';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
+import { useLanguage } from '../../../context/LanguageContext';
 
 const MALE_DATA = [
   { value: 25000, label: 'Jan' },
@@ -27,9 +28,17 @@ export interface UserGrowthChartProps {
   /** Real cumulative-growth points; when set, renders a single Total line. */
   data?: { value: number; label: string }[];
   maxValue?: number;
+  title?: string;
+  subtitle?: string;
 }
 
-export function UserGrowthChart({ data, maxValue }: UserGrowthChartProps) {
+export function UserGrowthChart({
+  data,
+  maxValue,
+  title,
+  subtitle,
+}: UserGrowthChartProps) {
+  const { t } = useLanguage();
   const chartWidth = UtilityMethods.wp(72);
   const chartHeight = UtilityMethods.hp(22);
   const isReal = !!data && data.length > 0;
@@ -42,9 +51,14 @@ export function UserGrowthChart({ data, maxValue }: UserGrowthChartProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>User Growth</Text>
+      <Text style={styles.title}>
+        {title || t('adminAnalytics.userGrowth', 'User Growth')}
+      </Text>
       <Text style={styles.subtitle}>
-        {isReal ? 'New users over time' : 'Monthly comparison'}
+        {subtitle ||
+          (isReal
+            ? t('adminAnalytics.newUsersOverTime', 'New users over time')
+            : t('adminAnalytics.monthlyComparison', 'Monthly comparison'))}
       </Text>
       <LineChart
         data={points}
@@ -87,7 +101,9 @@ export function UserGrowthChart({ data, maxValue }: UserGrowthChartProps) {
                 { backgroundColor: Colors.chartMalePurple },
               ]}
             />
-            <Text style={styles.legendText}>Total Users</Text>
+            <Text style={styles.legendText}>
+              {t('adminAnalytics.totalUsers', 'Total Users')}
+            </Text>
           </View>
         ) : (
           <>
@@ -98,7 +114,9 @@ export function UserGrowthChart({ data, maxValue }: UserGrowthChartProps) {
                   { backgroundColor: Colors.chartMalePurple },
                 ]}
               />
-              <Text style={styles.legendText}>Male</Text>
+              <Text style={styles.legendText}>
+                {t('adminAnalytics.male', 'Male')}
+              </Text>
             </View>
             <View style={styles.legendItem}>
               <View
@@ -107,7 +125,9 @@ export function UserGrowthChart({ data, maxValue }: UserGrowthChartProps) {
                   { backgroundColor: Colors.chartFemaleRed },
                 ]}
               />
-              <Text style={styles.legendText}>Female</Text>
+              <Text style={styles.legendText}>
+                {t('adminAnalytics.female', 'Female')}
+              </Text>
             </View>
           </>
         )}

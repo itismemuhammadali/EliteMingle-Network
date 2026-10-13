@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
@@ -10,6 +10,7 @@ import { MapPinSmallIcon } from './icons/MapPinSmallIcon';
 import { UserPlusGlyphIcon } from './icons/UserPlusGlyphIcon';
 import { UserTabMessagesIcon } from './icons/UserTabMessagesIcon';
 import { sendFriendRequest } from '../../services/friendService';
+import { ProfileAvatar } from '../general/ProfileAvatar';
 
 const AVATAR = UtilityMethods.wp(14);
 const ONLINE = UtilityMethods.wp(2.75);
@@ -159,12 +160,16 @@ export function PeopleYouMayKnowCard({
   );
 
   const onAddFriend = useCallback(() => {
-    setRequested(true);
     const currentUser = auth().currentUser;
-    const currentUid = currentUser?.uid || 'dev_user_123';
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to add friends.');
+      return;
+    }
+    setRequested(true);
     if (person.id) {
-      sendFriendRequest(currentUid, person.id).catch(err => {
+      sendFriendRequest(currentUser.uid, person.id).catch(err => {
         console.warn('Friend request dispatch error:', err?.message);
+        setRequested(false);
       });
     }
   }, [person.id]);
@@ -184,10 +189,9 @@ export function PeopleYouMayKnowCard({
           accessibilityRole="button"
           accessibilityLabel={`${person.name} profile`}
         >
-          <Image
-            source={{ uri: person.avatarUrl }}
-            style={styles.avatar}
-            resizeMode="cover"
+          <ProfileAvatar
+            uri={person.avatarUrl}
+            size={AVATAR}
           />
           {person.isOnline ? <View style={styles.onlineDot} /> : null}
         </TouchableOpacity>

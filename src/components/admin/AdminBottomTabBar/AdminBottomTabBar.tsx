@@ -36,7 +36,9 @@ const TABS: TabConfig[] = [
   { key: 'Notification', label: 'Alert', icon: NotificationIcon },
 ];
 
-interface AdminBottomTabBarProps {
+import { useLanguage } from '../../../context/LanguageContext';
+
+export interface AdminBottomTabBarProps {
   activeTab: AdminTab;
   onTabPress: (tab: AdminTab) => void;
 }
@@ -45,6 +47,25 @@ export function AdminBottomTabBar({
   activeTab,
   onTabPress,
 }: AdminBottomTabBarProps) {
+  const { t } = useLanguage();
+
+  const getTabLabel = (key: AdminTab): string => {
+    switch (key) {
+      case 'Home':
+        return t('navigation.home', 'Home');
+      case 'Users':
+        return t('navigation.users', 'Users');
+      case 'Reports':
+        return t('navigation.reports', 'Reports');
+      case 'Settings':
+        return t('navigation.settings', 'Settings');
+      case 'Notification':
+        return t('navigation.notifications', 'Alert');
+      default:
+        return key;
+    }
+  };
+
   return (
     <View style={styles.container}>
       {TABS.map(tab => {
@@ -70,7 +91,7 @@ export function AdminBottomTabBar({
                 }
               />
               <Text style={[styles.label, isActive && styles.labelActive]}>
-                {tab.label}
+                {getTabLabel(tab.key)}
               </Text>
             </View>
           </TouchableOpacity>

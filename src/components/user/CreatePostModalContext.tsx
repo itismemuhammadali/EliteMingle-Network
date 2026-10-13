@@ -29,13 +29,17 @@ export function CreatePostModalProvider({ children }: { children: ReactNode }) {
   const handleSubmit = useCallback(async (
     text: string,
     mediaUri?: string,
-    mediaType?: 'image' | 'video' | 'none',
+    mediaType?: 'image' | 'video' | 'audio' | 'none',
     feeling?: string,
   ) => {
     const currentUser = auth().currentUser;
-    const userId = currentUser?.uid || 'dev_user_123';
-    const username = profile?.displayName || currentUser?.displayName || 'Antigravity User';
-    const profilePicture = profile?.avatarUri || currentUser?.photoURL || 'https://via.placeholder.com/150';
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to publish a post.');
+      return;
+    }
+    const userId = currentUser.uid;
+    const username = profile?.displayName || currentUser?.displayName || 'Member';
+    const profilePicture = profile?.avatarUri || currentUser?.photoURL || '';
 
     try {
       await createPost({

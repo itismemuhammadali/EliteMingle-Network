@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import { ChatBackArrowIcon } from './icons';
+import { ProfileAvatar } from '../general/ProfileAvatar';
 
 const AV = UtilityMethods.wp(11);
 
@@ -29,6 +30,7 @@ export function ChatHeader({
       container: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: Colors.white,
         borderBottomWidth: 1,
         borderBottomColor: Colors.borderGrey,
         paddingHorizontal: UtilityMethods.wp(4),
@@ -85,7 +87,7 @@ export function ChatHeader({
         />
       </TouchableOpacity>
 
-      <Image source={{ uri: peerAvatarUri }} style={styles.avatar} />
+      <ProfileAvatar uri={peerAvatarUri} size={AV} />
 
       <View style={styles.titleBlock}>
         <Text style={styles.name} numberOfLines={1}>

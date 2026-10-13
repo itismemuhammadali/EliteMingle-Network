@@ -4,16 +4,21 @@ import { CalendarIcon } from '../icons';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
+import { useLanguage } from '../../../context/LanguageContext';
 
 interface TimeFilterCardProps {
   label: string;
   onChangePress?: () => void;
+  changeButtonText?: string;
 }
 
 export function TimeFilterCard({
   label,
   onChangePress,
+  changeButtonText,
 }: TimeFilterCardProps) {
+  const { t } = useLanguage();
+
   return (
     <View style={styles.card}>
       <View style={styles.left}>
@@ -28,7 +33,9 @@ export function TimeFilterCard({
         onPress={onChangePress}
         activeOpacity={0.7}
       >
-        <Text style={styles.changeText}>Change</Text>
+        <Text style={styles.changeText}>
+          {changeButtonText || t('common.change', 'Change')}
+        </Text>
       </TouchableOpacity>
     </View>
   );

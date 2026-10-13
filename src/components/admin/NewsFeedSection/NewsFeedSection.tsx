@@ -6,6 +6,8 @@ import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 
+import { useLanguage } from '../../../context/LanguageContext';
+
 interface NewsFeedSectionProps {
   posts: NewsPost[];
   onViewAllPress?: () => void;
@@ -17,6 +19,7 @@ export function NewsFeedSection({
   onViewAllPress,
   onViewPress,
 }: NewsFeedSectionProps) {
+  const { t } = useLanguage();
   const [warnModalPost, setWarnModalPost] = useState<NewsPost | null>(null);
   const [blockModalPost, setBlockModalPost] = useState<NewsPost | null>(null);
 
@@ -24,9 +27,9 @@ export function NewsFeedSection({
     <View style={styles.section}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>News Feed</Text>
+          <Text style={styles.title}>{t('navigation.feed', 'News Feed')}</Text>
           <Text style={styles.subtitle}>
-            Recent user posts and activity
+            {t('adminHome.recentActivity', 'Recent user posts and activity')}
           </Text>
         </View>
         <TouchableOpacity
@@ -34,7 +37,7 @@ export function NewsFeedSection({
           onPress={onViewAllPress}
           activeOpacity={0.7}
         >
-          <Text style={styles.viewAllButtonText}>View All</Text>
+          <Text style={styles.viewAllButtonText}>{t('adminHome.viewAll', 'View All')}</Text>
         </TouchableOpacity>
       </View>
 

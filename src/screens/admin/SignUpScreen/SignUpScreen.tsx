@@ -1,7 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
+
+const SignUpSchema = Yup.object().shape({
+  fullName: Yup.string()
+    .trim()
+    .min(2, 'Name must be at least 2 characters')
+    .required('Full name is required'),
+  email: Yup.string()
+    .trim()
+    .email('Invalid email address')
+    .required('Email is required'),
+  password: Yup.string()
+    .min(8, 'Password must be at least 8 characters')
+    .required('Password is required'),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref('password')], 'Passwords must match')
+    .required('Please confirm your password'),
+});
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MainLayout from '../../../components/general/MainLayout';
 import Logo from '../../../assets/svgs/logo.svg';
@@ -11,7 +29,7 @@ import EyeIcon from '../../../assets/svgs/EyeIcon.svg';
 import CheckmarkIcon from '../../../assets/svgs/Checkmark.svg';
 import PersonIcon from '../../../assets/svgs/PersonIcon.svg';
 import ButtonArrow from '../../../assets/Icons/ButtonArrow.svg';
-import { TitleText, Button, TextInputField } from '../../../components/general';
+import { TitleText, Button, TextInputField, SocialLoginButton } from '../../../components/general';
 import DescriptionText from '../../../components/general/descriptionText/DescriptionText';
 import Card from '../../../components/general/Card/Card';
 import UtilityMethods from '../../../utility/UtilityMethods';
@@ -28,11 +46,39 @@ type SignUpNavigationProp = NativeStackNavigationProp<
 export function SignUpScreen() {
   const navigation = useNavigation<SignUpNavigationProp>();
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = () => {
     navigation.navigate('SignIn');
+  };
+
+  const handleGoogleSignUp = async () => {
+    setIsSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (error: any) {
+      Alert.alert(
+        'Google Sign Up Failed',
+        error?.message || 'Failed to sign up with Google. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setIsSubmitting(true);
+    try {
+      await signInWithApple();
+    } catch (error: any) {
+      Alert.alert(
+        'Apple Sign Up Failed',
+        error?.message || 'Failed to sign up with Apple. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -51,6 +97,7 @@ export function SignUpScreen() {
 
         <Card style={styles.card}>
           <Formik
+            validationSchema={SignUpSchema}
             initialValues={{
               fullName: '',
               email: '',
@@ -172,6 +219,17 @@ export function SignUpScreen() {
             <Text style={styles.separatorText}>or</Text>
             <View style={styles.separatorLine} />
           </View>
+
+          <SocialLoginButton
+            provider="google"
+            onPress={handleGoogleSignUp}
+          />
+          {Platform.OS === 'ios' && (
+            <SocialLoginButton
+              provider="apple"
+              onPress={handleAppleSignUp}
+            />
+          )}
 
           <View style={styles.loginRow}>
             <Text style={styles.loginText}>Already have an account? </Text>

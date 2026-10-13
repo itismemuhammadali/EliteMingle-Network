@@ -26,7 +26,7 @@ export function formatFeeling(feeling: PostFeeling): string {
 }
 
 export function getPostShareUrl(postId: string): string {
-  return `https://najiyashade.app/post/${encodeURIComponent(postId)}`;
+  return `https://epm4life.app/post/${encodeURIComponent(postId)}`;
 }
 
 export type UserFeedFilter = 'friends' | 'nearby' | 'interests';
@@ -41,6 +41,7 @@ export type UserFeedPost = {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  audioUrl?: string;
   mediaUrl?: string;
   localUri?: string;
   /** 'image' | 'video' | 'none' — drives which player renders the media. */

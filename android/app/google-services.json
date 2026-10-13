@@ -12,7 +12,20 @@
           "package_name": "com.exceptionalpeoplemingle.epm"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "909617000261-ojt82cj08mk0p2hqlp61need77nn76s4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.exceptionalpeoplemingle.epm",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "909617000261-6pssmc2n1uc54thmi22e4ivuoq2r6ts8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exceptionalpeoplemingle.epm"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +56,20 @@
           "package_name": "com.najiyashade"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "909617000261-ojt82cj08mk0p2hqlp61need77nn76s4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.najiyashade",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "909617000261-6pssmc2n1uc54thmi22e4ivuoq2r6ts8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exceptionalpeoplemingle.epm"
+              }
+            }
+          ]
         }
       }
     }

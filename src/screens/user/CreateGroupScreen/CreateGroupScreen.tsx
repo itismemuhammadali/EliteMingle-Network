@@ -40,6 +40,7 @@ export function CreateGroupScreen() {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
   const [coverUri, setCoverUri] = useState<string | undefined>();
+  const [avatarUri, setAvatarUri] = useState<string | undefined>();
   const [selectedCategoryId, setSelectedCategoryId] =
     useState<CreateGroupCategoryId | null>(null);
   const [privacy, setPrivacy] = useState<CreateGroupPrivacy>('public');
@@ -81,13 +82,18 @@ export function CreateGroupScreen() {
 
     setCreating(true);
     try {
-      const ownerId = auth().currentUser?.uid || 'dev_user_123';
+      const ownerId = auth().currentUser?.uid;
+      if (!ownerId) {
+        Alert.alert('Sign In Required', 'You must be signed in to create a group.');
+        return;
+      }
       await createGroup({
         name: groupName.trim(),
         description: groupDescription.trim(),
         category: selectedCategoryId || 'other',
         privacy,
         coverUri: coverUri || '',
+        avatarUri: avatarUri || '',
         ownerId,
       });
       const cat = getCreateGroupCategoryLabel(selectedCategoryId);
@@ -111,6 +117,7 @@ export function CreateGroupScreen() {
     groupName,
     groupDescription,
     coverUri,
+    avatarUri,
     navigation,
     selectedCategoryId,
     privacy,
@@ -228,6 +235,8 @@ export function CreateGroupScreen() {
               onChangeGroupDescription={setGroupDescription}
               coverUri={coverUri}
               onChangeCoverUri={setCoverUri}
+              avatarUri={avatarUri}
+              onChangeAvatarUri={setAvatarUri}
             />
           )}
           {step === 2 && (
@@ -241,6 +250,7 @@ export function CreateGroupScreen() {
               groupName={groupName.trim()}
               groupDescription={groupDescription}
               coverUri={coverUri}
+              avatarUri={avatarUri}
               selectedCategoryId={selectedCategoryId}
               privacy={privacy}
               onChangePrivacy={setPrivacy}

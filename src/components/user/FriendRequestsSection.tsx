@@ -45,7 +45,8 @@ export function FriendRequestsSection() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    const uid = auth().currentUser?.uid || 'dev_user_123';
+    const uid = auth().currentUser?.uid;
+    if (!uid) return;
     const unsubscribe = subscribeToPendingRequests(uid, list => {
       setRequests(list as PendingRequest[]);
     });

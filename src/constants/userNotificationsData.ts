@@ -14,6 +14,10 @@ export type UserAppNotification = {
   /** e.g. "30m ago", "2h ago" */
   timeAgo: string;
   isRead: boolean;
+  actorId?: string;
+  postId?: string;
+  conversationId?: string;
+  groupId?: string;
 };
 
 export const USER_APP_NOTIFICATIONS: UserAppNotification[] = [

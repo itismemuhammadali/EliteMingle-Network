@@ -13,5 +13,5 @@ export const signInValidationSchema = Yup.object().shape({
 export type SignInFormValues = {
   email: string;
   password: string;
-  role: 'admin' | 'moderator';
+  role: 'admin' | 'moderator' | 'user';
 };

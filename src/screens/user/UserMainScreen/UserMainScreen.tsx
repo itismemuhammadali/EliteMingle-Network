@@ -11,6 +11,8 @@ import {
   CreatePostModalProvider,
   useCreatePostModal,
   AccessibilityModalProvider,
+  BciScanIndicator,
+  VoiceCommandFloatingIndicator,
 } from '../../../components/user';
 import { Colors } from '../../../constants/colors';
 import { UserHomeScreen } from '../UserHomeScreen';
@@ -51,9 +53,15 @@ function UserMainInner() {
     }
   };
 
+  const topBg =
+    activeTab === 'Messages' || activeTab === 'Profile'
+      ? Colors.white
+      : Colors.userFeedBackground;
+
   return (
-    <View style={styles.container}>
-      <View style={[styles.insetTop, { paddingTop: insets.top }]} />
+    <View style={[styles.container, { backgroundColor: topBg }]}>
+      <View style={[styles.insetTop, { paddingTop: insets.top, backgroundColor: topBg }]} />
+      <BciScanIndicator />
       <View style={styles.content}>{renderContent()}</View>
       <View style={styles.footer}>
         <UserBottomTabBar
@@ -62,6 +70,10 @@ function UserMainInner() {
           onFabPress={openCreatePost}
         />
       </View>
+      <VoiceCommandFloatingIndicator
+        onOpenCreatePost={openCreatePost}
+        onNavigateTab={setActiveTab}
+      />
     </View>
   );
 }

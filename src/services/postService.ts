@@ -3,10 +3,16 @@ import firestore from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import { formatTimeAgo } from '../utils/timeAgo';
 import { createNotification } from './notificationService';
+import {
+  mergePostsWithCache,
+  getCachedAuthorProfile,
+  setCachedAuthorProfile,
+  removeCachedPost,
+} from './postCacheService';
 
 export { formatTimeAgo };
 
-export type MediaType = 'image' | 'video' | 'none';
+export type MediaType = 'image' | 'video' | 'audio' | 'none';
 
 /**
  * Format Storage URLs for Android Emulator (replaces 127.0.0.1 and localhost with 10.0.2.2)
@@ -55,6 +61,41 @@ export const uploadAvatar = async (
     return formatStorageUrl(raw) || raw;
   } catch (err) {
     console.warn('Avatar upload failed, keeping local uri:', err);
+    return localUri;
+  }
+};
+
+/**
+ * Upload a locally-picked profile cover / poster to Firebase Storage and return a
+ * remote download URL. If the uri is already remote (http) or empty, it's
+ * returned unchanged.
+ */
+export const uploadCover = async (
+  userId: string,
+  localUri?: string | null,
+): Promise<string> => {
+  if (!localUri || localUri.startsWith('http')) return localUri || '';
+  try {
+    const cleanUserId = (userId || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const path = `covers/${cleanUserId}/cover_${Date.now()}.jpg`;
+    const ref = storage().ref(path);
+    const metadata = { contentType: 'image/jpeg' };
+
+    if (localUri.startsWith('data:')) {
+      const base64 = localUri.split(',')[1] || localUri;
+      await ref.putString(base64, 'base64', metadata);
+    } else {
+      const uploadUri =
+        Platform.OS === 'android' && localUri.startsWith('file://')
+          ? localUri.replace('file://', '')
+          : localUri;
+      await ref.putFile(uploadUri, metadata);
+    }
+
+    const raw = await ref.getDownloadURL();
+    return formatStorageUrl(raw) || raw;
+  } catch (err) {
+    console.warn('Cover upload failed, keeping local uri:', err);
     return localUri;
   }
 };
@@ -113,12 +154,18 @@ export const createPost = async (params: CreatePostParams): Promise<string> => {
     // 2. Upload media file to Firebase Storage if media is provided
     if (localMediaUri && mediaType !== 'none') {
       try {
-        const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+        const ext =
+          mediaType === 'video' ? 'mp4' : mediaType === 'audio' ? 'm4a' : 'jpg';
         const cleanUserId = (userId || 'user').replace(/[^a-zA-Z0-9_-]/g, '_');
         const storagePath = `posts/${cleanUserId}/${postId}/media_${Date.now()}.${ext}`;
         
         const metadata = {
-          contentType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+          contentType:
+            mediaType === 'video'
+              ? 'video/mp4'
+              : mediaType === 'audio'
+              ? 'audio/mp4'
+              : 'image/jpeg',
         };
         const storageRef = storage().ref(storagePath);
 
@@ -178,7 +225,8 @@ export const createPost = async (params: CreatePostParams): Promise<string> => {
  */
 export const deletePost = async (
   postId: string,
-  requesterUserId: string,
+  requesterUserId?: string,
+  isAdmin: boolean = false,
 ): Promise<void> => {
   try {
     const postRef = firestore().collection('posts').doc(postId);
@@ -190,8 +238,8 @@ export const deletePost = async (
 
     const data = snapshot.data() as PostDocument | undefined;
 
-    // Ownership check: only the author can delete their own post.
-    if (data?.userId && requesterUserId && data.userId !== requesterUserId) {
+    // Ownership check: only the author or an admin can delete this post.
+    if (!isAdmin && data?.userId && requesterUserId && data.userId !== requesterUserId) {
       throw new Error('You are not allowed to delete this post.');
     }
 
@@ -210,6 +258,7 @@ export const deletePost = async (
 
     // 2. Delete the Firestore document.
     await postRef.delete();
+    removeCachedPost(postId);
   } catch (error) {
     console.error('Error deleting post in backend:', error);
     throw error;
@@ -404,7 +453,10 @@ export const subscribeToComments = (
 const mapPostDoc = (doc: any) => {
   const data = doc.data();
   const username = data.username || 'User';
-  const hasMedia = data.mediaType === 'image' || data.mediaType === 'video';
+  const hasMedia =
+    data.mediaType === 'image' ||
+    data.mediaType === 'video' ||
+    data.mediaType === 'audio';
   const storageMediaUrl = hasMedia && data.mediaUrl ? formatStorageUrl(data.mediaUrl) : undefined;
   const fallbackLocalUri = hasMedia ? data.localMediaUri : undefined;
   const rawAvatarUrl = data.profilePicture && data.profilePicture.startsWith('http') ? data.profilePicture : undefined;
@@ -424,6 +476,7 @@ const mapPostDoc = (doc: any) => {
     // imageUrl kept for existing image consumers; videoUrl exposed for video players
     imageUrl: data.mediaType === 'image' ? finalMediaUrl : undefined,
     videoUrl: data.mediaType === 'video' ? finalMediaUrl : undefined,
+    audioUrl: data.mediaType === 'audio' ? finalMediaUrl : undefined,
     mediaUrl: finalMediaUrl,
     localUri: fallbackLocalUri,
     avatarUrl: formatStorageUrl(rawAvatarUrl) || rawAvatarUrl,
@@ -445,24 +498,40 @@ const enrichWithAuthorProfiles = async (posts: any[]): Promise<any[]> => {
     new Set(posts.map(p => p.authorUserId).filter(Boolean)),
   );
   const profiles: Record<string, { name?: string; avatar?: string }> = {};
-  await Promise.all(
-    ids.map(async id => {
-      try {
-        const doc = await firestore().collection('users').doc(id).get();
-        const exists =
-          typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists;
-        if (!exists) return;
-        const d = doc.data() || {};
-        const rawAvatar = d.avatarUri || d.profilePicture || d.avatarUrl || '';
-        profiles[id] = {
-          name: d.fullName || d.displayName || d.name || undefined,
-          avatar: rawAvatar ? formatStorageUrl(rawAvatar) || rawAvatar : undefined,
-        };
-      } catch {
-        /* ignore individual lookup failures */
-      }
-    }),
-  );
+  const uncachedIds: string[] = [];
+
+  for (const id of ids) {
+    const cached = getCachedAuthorProfile(id);
+    if (cached) {
+      profiles[id] = cached;
+    } else {
+      uncachedIds.push(id);
+    }
+  }
+
+  if (uncachedIds.length > 0) {
+    await Promise.all(
+      uncachedIds.map(async id => {
+        try {
+          const doc = await firestore().collection('users').doc(id).get();
+          const exists =
+            typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists;
+          if (!exists) return;
+          const d = doc.data() || {};
+          const rawAvatar = d.avatarUri || d.profilePicture || d.avatarUrl || '';
+          const prof = {
+            name: d.fullName || d.displayName || d.name || undefined,
+            avatar: rawAvatar ? formatStorageUrl(rawAvatar) || rawAvatar : undefined,
+          };
+          profiles[id] = prof;
+          setCachedAuthorProfile(id, prof);
+        } catch {
+          /* ignore individual lookup failures */
+        }
+      }),
+    );
+  }
+
   return posts.map(p => {
     const prof = profiles[p.authorUserId];
     if (!prof) return p;
@@ -489,7 +558,8 @@ export const subscribeToPosts = (
         const enriched = await enrichWithAuthorProfiles(
           snapshot.docs.map(mapPostDoc),
         );
-        onPostsUpdate(enriched);
+        const cachedMerged = mergePostsWithCache(enriched);
+        onPostsUpdate(cachedMerged);
       },
       error => {
         console.error('Firestore posts snapshot error:', error);
@@ -525,5 +595,39 @@ export const subscribeToGroupPosts = (
       },
       error => console.error('Group posts snapshot error:', error),
     );
+};
+
+/**
+ * Save or un-save a post for the current user in Firestore.
+ */
+export const savePost = async (
+  postId: string,
+  userId: string,
+): Promise<boolean> => {
+  if (!postId || !userId) return false;
+  try {
+    const userRef = firestore().collection('users').doc(userId);
+    const snap = await userRef.get();
+    const currentSaved = (snap.data()?.savedPostIds as string[]) || [];
+    const isSaved = currentSaved.includes(postId);
+
+    if (isSaved) {
+      await userRef.update({
+        savedPostIds: firestore.FieldValue.arrayRemove(postId),
+      });
+      return false;
+    } else {
+      await userRef.set(
+        {
+          savedPostIds: firestore.FieldValue.arrayUnion(postId),
+        },
+        { merge: true },
+      );
+      return true;
+    }
+  } catch (err) {
+    console.warn('savePost error:', err);
+    return false;
+  }
 };
 

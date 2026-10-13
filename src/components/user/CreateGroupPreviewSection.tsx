@@ -17,6 +17,7 @@ export interface CreateGroupPreviewSectionProps {
   groupName: string;
   groupDescription: string;
   coverUri?: string;
+  avatarUri?: string;
   selectedCategoryId: CreateGroupCategoryId | null;
 }
 
@@ -24,6 +25,7 @@ export function CreateGroupPreviewSection({
   groupName,
   groupDescription,
   coverUri,
+  avatarUri,
   selectedCategoryId,
 }: CreateGroupPreviewSectionProps) {
   const displayName = groupName.trim() || 'New';
@@ -120,9 +122,9 @@ export function CreateGroupPreviewSection({
         <Text style={styles.previewLabel}>Preview:</Text>
         <View style={styles.card}>
           <View style={styles.cardInner}>
-            {coverUri ? (
+            {avatarUri || coverUri ? (
               <Image
-                source={{ uri: coverUri }}
+                source={{ uri: avatarUri || coverUri }}
                 style={styles.thumb}
                 resizeMode="cover"
               />

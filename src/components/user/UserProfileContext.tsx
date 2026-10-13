@@ -13,6 +13,8 @@ import {
   DEFAULT_USER_PROFILE,
   type UserProfileState,
 } from '../../constants/userProfileMock';
+import { useAppDispatch } from '../../redux/hooks';
+import { setAllAccessibility } from '../../redux/roleSlice';
 
 type UserProfileContextValue = {
   profile: UserProfileState;
@@ -25,6 +27,7 @@ const UserProfileContext = createContext<UserProfileContextValue | undefined>(
 );
 
 export function UserProfileProvider({ children }: { children: ReactNode }) {
+  const dispatch = useAppDispatch();
   const [profile, setProfileState] = useState<UserProfileState>(
     DEFAULT_USER_PROFILE,
   );
@@ -58,9 +61,28 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
         .doc(firebaseUser.uid)
         .onSnapshot(
           snapshot => {
-            if (snapshot && snapshot.exists) {
+            const exists = snapshot && (typeof (snapshot as any).exists === 'function' ? (snapshot as any).exists() : (snapshot as any).exists);
+            if (exists) {
               const data = snapshot.data();
               if (data) {
+                const a = data.accessibility || {};
+                const ttsVal =
+                  a.ttsEnabled !== undefined
+                    ? !!a.ttsEnabled
+                    : data.textToSpeech !== undefined
+                    ? !!data.textToSpeech
+                    : false;
+                const voiceVal =
+                  a.voiceCommandsEnabled !== undefined
+                    ? !!a.voiceCommandsEnabled
+                    : data.voiceCommands !== undefined
+                    ? !!data.voiceCommands
+                    : false;
+                const fontScaleVal =
+                  typeof a.fontScale === 'number' ? a.fontScale : 0;
+                const simplifiedVal = !!a.simplifiedUi;
+                const bciVal = !!a.bciEnabled;
+
                 setProfileState(prev => ({
                   ...prev,
                   displayName: data.fullName || firebaseUser.displayName || prev.displayName,
@@ -69,7 +91,20 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                   phone: data.phone !== undefined ? data.phone : prev.phone,
                   location: data.location !== undefined ? data.location : prev.location,
                   avatarUri: data.avatarUri !== undefined ? data.avatarUri : prev.avatarUri,
+                  coverUri: data.coverUri !== undefined ? data.coverUri : prev.coverUri,
+                  voiceCommandsEnabled: voiceVal,
+                  ttsEnabled: ttsVal,
                 }));
+
+                dispatch(
+                  setAllAccessibility({
+                    fontScale: fontScaleVal,
+                    ttsEnabled: ttsVal,
+                    voiceCommandsEnabled: voiceVal,
+                    simplifiedUi: simplifiedVal,
+                    bciEnabled: bciVal,
+                  }),
+                );
               }
             }
           },

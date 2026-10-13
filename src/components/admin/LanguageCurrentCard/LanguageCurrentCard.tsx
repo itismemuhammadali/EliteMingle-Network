@@ -10,18 +10,20 @@ interface LanguageCurrentCardProps {
   languageName: string;
   /** Secondary line e.g. "(English)" */
   nativeLabel: string;
+  label?: string;
 }
 
 export function LanguageCurrentCard({
   languageName,
   nativeLabel,
+  label = 'Current Language',
 }: LanguageCurrentCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.row}>
         <GlobeIcon size={UtilityMethods.wp(6)} color={Colors.primaryPurple} />
         <View style={styles.textBlock}>
-          <Text style={styles.label}>Current Language</Text>
+          <Text style={styles.label}>{label}</Text>
           <Text style={styles.value}>{languageName}</Text>
           <Text style={styles.native}>{nativeLabel}</Text>
         </View>

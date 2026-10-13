@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Formik } from 'formik';
@@ -11,6 +11,7 @@ import DescriptionText from '../../../components/general/descriptionText/Descrip
 import Card from '../../../components/general/Card/Card';
 import MainLayout from '../../../components/general/MainLayout';
 import UtilityMethods from '../../../utility/UtilityMethods';
+import FontSize from '../../../utility/FontSize';
 import { Colors } from '../../../constants/colors';
 import {
   forgotPasswordValidationSchema,
@@ -32,13 +33,13 @@ export function ForgotPasswordScreen() {
   const { sendPasswordReset } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSendCode = async (values: ForgotPasswordFormValues) => {
+  const handleSendEmail = async (values: ForgotPasswordFormValues) => {
     setIsSubmitting(true);
     try {
       await sendPasswordReset(values.email);
       Alert.alert(
         'Email Sent',
-        'A password reset link has been sent to your email address.',
+        'A password reset link has been sent to your email. Please open the link in your browser to set your new password.',
         [{ text: 'OK', onPress: () => navigation.navigate('SignIn') }],
       );
     } catch (error: any) {
@@ -47,6 +48,8 @@ export function ForgotPasswordScreen() {
         message = 'No account found with this email address.';
       } else if (error.code === 'auth/invalid-email') {
         message = 'Invalid email address.';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Too many requests. Please wait a minute before trying again.';
       }
       Alert.alert('Error', message);
     } finally {
@@ -62,50 +65,57 @@ export function ForgotPasswordScreen() {
       contentContainerStyle={styles.contentContainer}
     >
       <View style={styles.headerSection}>
-          <Logo />
-          <TitleText style={styles.title}>Forgot Password?</TitleText>
-          <DescriptionText text="No worries! Enter your email and we'll send you a code to reset your password." />
-        </View>
+        <Logo />
+        <TitleText style={styles.title}>Forgot Password?</TitleText>
+        <DescriptionText text="Enter your registered email address and we will send you a password reset link." />
+      </View>
 
-        <Card style={styles.card}>
-          <Formik
-            initialValues={initialValues}
-            validationSchema={forgotPasswordValidationSchema}
-            onSubmit={handleSendCode}
-          >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              values,
-              errors,
-              touched,
-            }) => (
-              <>
-                <TextInputField
-                  label="Email Address"
-                  leftIcon={<EmailIcon />}
-                  leftIconName="email-outline"
-                  placeholder="your.email@example.com"
-                  value={values.email}
-                  onChangeText={handleChange('email')}
-                  onBlur={handleBlur('email')}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  error={errors.email}
-                  touched={touched.email}
-                />
+      <Card style={styles.card}>
+        <Formik
+          initialValues={initialValues}
+          validationSchema={forgotPasswordValidationSchema}
+          onSubmit={handleSendEmail}
+        >
+          {({
+            handleChange,
+            handleBlur,
+            handleSubmit,
+            values,
+            errors,
+            touched,
+          }) => (
+            <>
+              <TextInputField
+                label="Email Address"
+                leftIcon={<EmailIcon />}
+                leftIconName="email-outline"
+                placeholder="your.email@example.com"
+                value={values.email}
+                onChangeText={handleChange('email')}
+                onBlur={handleBlur('email')}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                error={errors.email}
+                touched={touched.email}
+              />
 
-                <Button
-                  title="Send Verification Code"
-                  onPress={() => handleSubmit()}
-                  style={styles.button}
-                  disabled={isSubmitting}
-                />
-              </>
-            )}
-          </Formik>
-        </Card>
+              <Button
+                title={isSubmitting ? 'Sending...' : 'Send Email'}
+                onPress={() => handleSubmit()}
+                style={styles.button}
+                disabled={isSubmitting}
+              />
+
+              <TouchableOpacity
+                style={styles.backToSignInButton}
+                onPress={() => navigation.navigate('SignIn')}
+              >
+                <Text style={styles.backToSignInText}>Back to Sign In</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </Formik>
+      </Card>
     </MainLayout>
   );
 }
@@ -131,13 +141,22 @@ const styles = StyleSheet.create({
     marginBottom: UtilityMethods.hp(0.5),
   },
   card: {
-    //flex: 1,
-    height: UtilityMethods.hp(30),
+    paddingVertical: UtilityMethods.hp(3),
     marginTop: 0,
   },
   button: {
     alignSelf: 'stretch',
     width: '100%',
     marginTop: UtilityMethods.hp(1),
+  },
+  backToSignInButton: {
+    marginTop: UtilityMethods.hp(2),
+    alignItems: 'center',
+    paddingVertical: UtilityMethods.hp(1),
+  },
+  backToSignInText: {
+    fontSize: FontSize.VALUE(14),
+    fontWeight: '600',
+    color: Colors.primaryPurple,
   },
 });

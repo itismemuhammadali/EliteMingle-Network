@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -44,6 +44,9 @@ import { MOCK_USERS } from '../../../constants/mockData';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
+import { useUsersList } from '../../../context/UsersListContext';
+import firestore from '@react-native-firebase/firestore';
+import { ProfileAvatar } from '../../../components/general/ProfileAvatar';
 
 export function ManageUserScreen() {
   const navigation =
@@ -52,9 +55,64 @@ export function ManageUserScreen() {
     >();
   const route = useRoute<RouteProp<RootStackParamList, 'ManageUser'>>();
   const insets = useSafeAreaInsets();
-  const { userId } = route.params;
+  const { userId = '' } = route.params || {};
 
-  const user = MOCK_USERS.find(u => u.id === userId);
+  const { users, updateUser, deleteUser } = useUsersList();
+  const contextUser = users.find(u => u.id === userId);
+  const mockUser = MOCK_USERS.find(u => u.id === userId);
+  const [firestoreUser, setFirestoreUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (!contextUser && userId) {
+      firestore()
+        .collection('users')
+        .doc(userId)
+        .get()
+        .then(doc => {
+          if (typeof doc.exists === 'function' ? doc.exists() : doc.exists) {
+            const d = doc.data();
+            setFirestoreUser({
+              id: doc.id,
+              name: d?.fullName || d?.displayName || 'User',
+              email: d?.email || '',
+              phone: d?.phone || 'N/A',
+              role: d?.role || 'User',
+              status: (d?.status || 'active').charAt(0).toUpperCase() + (d?.status || 'active').slice(1),
+              avatarUrl: d?.avatarUri || d?.profilePicture || '',
+              memberSince:
+                typeof d?.createdAt?.toDate === 'function'
+                  ? d.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                  : 'Recently',
+              totalLikes: 0,
+              totalComments: 0,
+              totalShares: 0,
+            });
+          }
+        })
+        .catch(err => console.warn('Fetch user doc error:', err));
+    }
+  }, [userId, contextUser, mockUser]);
+
+  const user = React.useMemo(() => {
+    if (contextUser) {
+      return {
+        id: contextUser.id,
+        name: contextUser.name,
+        email: contextUser.email,
+        phone: contextUser.phone || 'N/A',
+        role: contextUser.role || 'User',
+        status: contextUser.status.charAt(0).toUpperCase() + contextUser.status.slice(1),
+        avatarUrl: contextUser.avatarUri || '',
+        memberSince: 'Recently',
+        totalLikes: 0,
+        totalComments: 0,
+        totalShares: 0,
+      };
+    }
+    if (firestoreUser) return firestoreUser;
+    return mockUser || null;
+  }, [contextUser, firestoreUser, mockUser]);
+
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
@@ -103,10 +161,9 @@ export function ManageUserScreen() {
         <View style={styles.profileCard}>
           <View style={styles.avatarSection}>
             <View style={styles.avatarRing}>
-              <Image
-                source={{ uri: user.avatarUrl }}
-                style={styles.avatarImage}
-                resizeMode="cover"
+              <ProfileAvatar
+                uri={user.avatarUrl}
+                size={UtilityMethods.wp(22)}
               />
             </View>
             <Text style={styles.userName}>{user.name}</Text>
@@ -179,7 +236,7 @@ export function ManageUserScreen() {
             <View style={styles.activityItem}>
               <View style={styles.interactBox}>
                 <FilledHeartIcon size={UtilityMethods.wp(5)} color="#F44336" />
-                <Text style={styles.activityNumber}>{user.totalLikes}</Text>
+                <Text style={styles.activityNumber}>{user.totalLikes ?? 0}</Text>
               </View>
               <Text style={styles.activityLabel}>Likes</Text>
             </View>
@@ -187,7 +244,7 @@ export function ManageUserScreen() {
             <View style={styles.activityItem}>
               <View style={styles.interactBox}>
                 <CommentIcon size={UtilityMethods.wp(5)} color="#4C7DFF" />
-                <Text style={styles.activityNumber}>{user.totalComments}</Text>
+                <Text style={styles.activityNumber}>{user.totalComments ?? 0}</Text>
               </View>
               <Text style={styles.activityLabel}>Comments</Text>
             </View>
@@ -195,7 +252,7 @@ export function ManageUserScreen() {
             <View style={styles.activityItem}>
               <View style={styles.interactBox}>
                 <ShareIconSvg width={UtilityMethods.wp(5)} height={UtilityMethods.wp(5)} />
-                <Text style={styles.activityNumber}>{user.totalShares}</Text>
+                <Text style={styles.activityNumber}>{user.totalShares ?? 0}</Text>
               </View>
               <Text style={styles.activityLabel}>Shares</Text>
             </View>
@@ -213,7 +270,9 @@ export function ManageUserScreen() {
                 size={UtilityMethods.wp(5)}
                 color={Colors.adminWarningYellow}
               />
-              <Text style={styles.suspendButtonText}>Suspend</Text>
+              <Text style={styles.suspendButtonText}>
+                {user.status.toLowerCase() === 'inactive' ? 'Activate' : 'Suspend'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.deleteButton}
@@ -248,14 +307,22 @@ export function ManageUserScreen() {
         visible={showSuspendModal}
         type="suspendUser"
         entityName={user.name}
-        onConfirm={() => setShowSuspendModal(false)}
+        onConfirm={() => {
+          const nextStatus = user.status.toLowerCase() === 'inactive' ? 'active' : 'inactive';
+          updateUser(user.id, { status: nextStatus });
+          setShowSuspendModal(false);
+        }}
         onCancel={() => setShowSuspendModal(false)}
       />
       <ConfirmationModal
         visible={showDeleteModal}
         type="deleteUser"
         entityName={user.name}
-        onConfirm={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          deleteUser(user.id);
+          setShowDeleteModal(false);
+          navigation.goBack();
+        }}
         onCancel={() => setShowDeleteModal(false)}
       />
     </MainLayout>

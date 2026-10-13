@@ -5,13 +5,49 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
-import PlusIcon from '../../assets/Icons/PlusIcon.svg';
+import Svg, { Path } from 'react-native-svg';
 import {
   UserTabHomeIcon,
   UserTabMessagesIcon,
   UserTabGroupsIcon,
   UserTabProfileIcon,
 } from './icons';
+
+function PlusWithCircleIcon({
+  size = 28,
+  color = Colors.white,
+  strokeWidth = 2.4,
+}: {
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <Path
+        d="M15.997 29.3282C23.3595 29.3282 29.328 23.3597 29.328 15.9972C29.328 8.63469 23.3595 2.6662 15.997 2.6662C8.63451 2.6662 2.66602 8.63469 2.66602 15.9972C2.66602 23.3597 8.63451 29.3282 15.997 29.3282Z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M10.665 15.9972H21.3298"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M15.9971 10.6648V21.3296"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 
 export type UserTab = 'Home' | 'Messages' | 'Groups' | 'Profile';
 
@@ -138,7 +174,11 @@ export function UserBottomTabBar({
             colors={[Colors.fabGradientStart, Colors.fabGradientEnd]}
             style={styles.fabGradient}
           >
-            <PlusIcon size={UtilityMethods.wp(6)} color={Colors.white} />
+            <PlusWithCircleIcon
+              size={UtilityMethods.wp(7.5)}
+              color={Colors.white}
+              strokeWidth={2.4}
+            />
           </LinearGradient>
         </TouchableOpacity>
       </View>

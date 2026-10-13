@@ -20,7 +20,6 @@ import {
   LockIcon,
   ShieldIcon,
   NotificationIcon,
-  MoonIcon,
   GlobeIcon,
   HelpIcon,
   LogoutIcon,
@@ -32,9 +31,10 @@ import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 
 import { useAuth } from '../../../context/AuthContext';
+import { useLanguage } from '../../../context/LanguageContext';
+import { getLocalizedRole } from '../../../services/databaseTranslationService';
 import { Alert } from 'react-native';
-
-const DEFAULT_AVATAR_URL = 'https://i.pravatar.cc/300?u=admin-user';
+import { ProfileAvatar } from '../../../components/general/ProfileAvatar';
 
 interface AdminSettingsScreenProps {
   onNotificationPress?: () => void;
@@ -46,22 +46,27 @@ export function AdminSettingsScreen({
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList, 'Main'>>();
   const { signOut } = useAuth();
+  const { t, language } = useLanguage();
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await signOut();
-          } catch (error) {
-            console.warn('Logout error:', error);
-          }
+    Alert.alert(
+      t('adminSettings.logoutConfirmTitle', 'Logout'),
+      t('adminSettings.logoutConfirmMessage', 'Are you sure you want to log out of your account?'),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('adminSettings.logout', 'Logout'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              console.warn('Logout error:', error);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
 
@@ -72,7 +77,6 @@ export function AdminSettingsScreen({
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
 
   const currentUser = auth().currentUser;
 
@@ -91,9 +95,35 @@ export function AdminSettingsScreen({
         setRole(d.role || 'Administrator');
         const a = d.avatarUri || d.profilePicture || '';
         setAvatarUri(a && String(a).startsWith('http') ? a : undefined);
+        if (d.twoFactorEnabled !== undefined) setTwoFactorEnabled(d.twoFactorEnabled);
+        if (d.notificationsEnabled !== undefined) setNotificationsEnabled(d.notificationsEnabled);
       });
     return () => unsubscribe();
   }, [currentUser]);
+
+  const handleToggleTwoFactor = async (val: boolean) => {
+    setTwoFactorEnabled(val);
+    const uid = currentUser?.uid;
+    if (uid) {
+      firestore()
+        .collection('users')
+        .doc(uid)
+        .set({ twoFactorEnabled: val }, { merge: true })
+        .catch(console.error);
+    }
+  };
+
+  const handleToggleNotifications = async (val: boolean) => {
+    setNotificationsEnabled(val);
+    const uid = currentUser?.uid;
+    if (uid) {
+      firestore()
+        .collection('users')
+        .doc(uid)
+        .set({ notificationsEnabled: val }, { merge: true })
+        .catch(console.error);
+    }
+  };
 
   const handleSaveProfile = async () => {
     const uid = currentUser?.uid;
@@ -182,8 +212,8 @@ export function AdminSettingsScreen({
     >
       <View style={{ paddingTop: UtilityMethods.hp(0.6) }}>
         <AdminHeader
-          title="Settings"
-          subtitle="Manage your account preferences"
+          title={t('adminSettings.title', 'Settings')}
+          subtitle={t('adminSettings.subtitle', 'Manage your account preferences')}
           showDivider={false}
           hasNotificationBadge={false}
           rightSlot={<View />}
@@ -194,13 +224,12 @@ export function AdminSettingsScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer} bounces={false}>
-        <SettingsCard title="Profile">
+        <SettingsCard title={t('adminSettings.profileSection', 'Profile')}>
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
-            <Image
-              source={{ uri: avatarUri || DEFAULT_AVATAR_URL }}
-              style={styles.avatar}
-              resizeMode="cover"
+            <ProfileAvatar
+              uri={avatarUri}
+              size={UtilityMethods.wp(20)}
             />
             <TouchableOpacity
               style={styles.cameraButton}
@@ -211,11 +240,11 @@ export function AdminSettingsScreen({
             </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>{fullName || 'Admin'}</Text>
-          <Text style={styles.profileRole}>{role}</Text>
+          <Text style={styles.profileRole}>{getLocalizedRole(role)}</Text>
         </View>
 
         <TextInputField
-          label="Full Name"
+          label={t('adminSettings.fullName', 'Full Name')}
           placeholder="Admin User"
           value={fullName}
           onChangeText={setFullName}
@@ -228,7 +257,7 @@ export function AdminSettingsScreen({
           }
         />
         <TextInputField
-          label="Email Address"
+          label={t('adminSettings.emailAddress', 'Email Address')}
           placeholder="admin@example.com"
           value={email}
           onChangeText={setEmail}
@@ -242,7 +271,7 @@ export function AdminSettingsScreen({
           }
         />
         <TextInputField
-          label="Phone Number"
+          label={t('adminSettings.phone', 'Phone Number')}
           placeholder="+1 234-567-8900"
           value={phone}
           onChangeText={setPhone}
@@ -261,11 +290,11 @@ export function AdminSettingsScreen({
           onPress={handleSaveProfile}
           activeOpacity={0.7}
         >
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+          <Text style={styles.saveButtonText}>{t('adminSettings.saveChanges', 'Save Changes')}</Text>
         </TouchableOpacity>
       </SettingsCard>
 
-      <SettingsCard title="Security">
+      <SettingsCard title={t('adminSettings.securitySection', 'Security')}>
         <SettingsRow
           icon={
             <LockIcon
@@ -274,8 +303,8 @@ export function AdminSettingsScreen({
             />
           }
           iconBgColor="rgba(76, 125, 255, 0.15)"
-          title="Change Password"
-          subtitle="Update your password"
+          title={t('adminSettings.changePassword', 'Change Password')}
+          subtitle={t('adminSettings.changePasswordSubtitle', 'Update your password')}
           showChevron
           onPress={() => navigation.navigate('ChangePassword')}
         />
@@ -287,15 +316,15 @@ export function AdminSettingsScreen({
             />
           }
           iconBgColor="rgba(46, 204, 113, 0.15)"
-          title="Two-Factor Auth"
-          subtitle="Extra security layer"
+          title={t('adminSettings.twoFactor', 'Two-Factor Auth')}
+          subtitle={t('adminSettings.twoFactorSubtitle', 'Extra security layer')}
           showToggle
           toggleValue={twoFactorEnabled}
-          onToggleChange={setTwoFactorEnabled}
+          onToggleChange={handleToggleTwoFactor}
         />
       </SettingsCard>
 
-      <SettingsCard title="Preferences">
+      <SettingsCard title={t('adminSettings.preferencesSection', 'Preferences')}>
         <SettingsRow
           icon={
             <NotificationIcon
@@ -304,31 +333,17 @@ export function AdminSettingsScreen({
             />
           }
           iconBgColor={Colors.lightPurple}
-          title="Notifications"
-          subtitle="Push notifications"
+          title={t('adminSettings.notifications', 'Notifications')}
+          subtitle={t('adminSettings.notificationsSubtitle', 'Push notifications')}
           showToggle
           toggleValue={notificationsEnabled}
-          onToggleChange={setNotificationsEnabled}
-        />
-        <SettingsRow
-          icon={
-            <MoonIcon
-              size={UtilityMethods.wp(5)}
-              color={Colors.adminStatsBlue}
-            />
-          }
-          iconBgColor="rgba(76, 125, 255, 0.15)"
-          title="Dark Mode"
-          subtitle="Toggle dark theme"
-          showToggle
-          toggleValue={darkModeEnabled}
-          onToggleChange={setDarkModeEnabled}
+          onToggleChange={handleToggleNotifications}
         />
         <SettingsRow
           icon={<GlobeIcon size={UtilityMethods.wp(5)} color="#FF9800" />}
           iconBgColor="rgba(255, 152, 0, 0.15)"
-          title="Language"
-          subtitle="English (US)"
+          title={t('adminSettings.language', 'Language')}
+          subtitle={language === 'es' ? 'Español (ES)' : 'English (US)'}
           showChevron
           onPress={() => navigation.navigate('Language')}
         />
@@ -340,8 +355,8 @@ export function AdminSettingsScreen({
             />
           }
           iconBgColor="rgba(76, 125, 255, 0.15)"
-          title="Help & Support"
-          subtitle="Get help and contact us"
+          title={t('adminSettings.helpSupport', 'Help & Support')}
+          subtitle={t('adminSettings.helpSupportSubtitle', 'Get help and contact us')}
           showChevron
           onPress={() => navigation.navigate('HelpSupport')}
         />
@@ -354,7 +369,7 @@ export function AdminSettingsScreen({
       >
 
         <LogoutIcon size={UtilityMethods.wp(5)} color={Colors.adminErrorRed} />
-        <Text style={styles.logoutButtonText}>Logout</Text>
+        <Text style={styles.logoutButtonText}>{t('adminSettings.logout', 'Logout')}</Text>
       </TouchableOpacity>
       </ScrollView>
     </MainLayout>

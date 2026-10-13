@@ -12,6 +12,7 @@ export interface UserCenteredScreenHeaderProps {
   /** Right side actions */
   rightSlot?: React.ReactNode;
   onTitlePress?: () => void;
+  backgroundColor?: string;
 }
 
 /**
@@ -22,27 +23,30 @@ export function UserCenteredScreenHeader({
   leftSlot,
   rightSlot,
   onTitlePress,
+  backgroundColor = Colors.white,
 }: UserCenteredScreenHeaderProps) {
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
       container: {
         position: 'relative',
+        height: UtilityMethods.hp(7.5),
+        minHeight: UtilityMethods.hp(7.5),
         borderBottomWidth: 1,
         borderBottomColor: Colors.borderGrey,
         paddingHorizontal: UtilityMethods.wp(5),
-        marginBottom: UtilityMethods.hp(1),
-        paddingVertical: UtilityMethods.hp(1.75),
+        backgroundColor,
+        justifyContent: 'center',
       },
       row: {
         flexDirection: 'row',
         alignItems: 'center',
-        minHeight: UtilityMethods.hp(5.5),
+        justifyContent: 'space-between',
+        height: '100%',
       },
       half: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        minHeight: UtilityMethods.hp(5.5),
       },
       halfLeft: {
         justifyContent: 'flex-start',

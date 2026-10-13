@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  startAudioRecording,
+  stopAudioRecording,
+  cancelAudioRecording,
+} from '../../services/audioRecorderService';
+import { VoiceMemoPlayer } from './VoiceMemoPlayer';
 import {
   View,
   Text,
@@ -71,7 +77,7 @@ export interface CreatePostModalProps {
   onSubmit?: (
     text: string,
     mediaUri?: string,
-    mediaType?: 'image' | 'video' | 'none',
+    mediaType?: 'image' | 'video' | 'audio' | 'none',
     feeling?: string,
   ) => void;
 }
@@ -85,12 +91,15 @@ export function CreatePostModal({
   const { profile } = useUserProfile();
   const [text, setText] = useState('');
   const [mediaUri, setMediaUri] = useState<string | undefined>(undefined);
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'none'>('none');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | 'none'>('none');
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [privacy, setPrivacy] = useState<'Public' | 'Friends' | 'Only me'>(
     'Public',
   );
   const [feeling, setFeeling] = useState<PostFeeling | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const recordIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -99,12 +108,22 @@ export function CreatePostModal({
       setMediaType('none');
       setPrivacyOpen(false);
       setFeeling(null);
+      if (recordIntervalRef.current) {
+        clearInterval(recordIntervalRef.current);
+        recordIntervalRef.current = null;
+      }
+      if (isRecording) {
+        cancelAudioRecording().catch(() => {});
+        setIsRecording(false);
+      }
+      setRecordSeconds(0);
     }
-  }, [visible]);
+  }, [visible, isRecording]);
 
   const len = text.length;
   const trimmed = text.trim();
   const canPost =
+    !isRecording &&
     (trimmed.length > 0 || mediaUri !== undefined || feeling !== null) &&
     len <= CREATE_POST_MAX_LENGTH;
 
@@ -193,14 +212,63 @@ export function CreatePostModal({
     });
   }, []);
 
-  const handleVoice = useCallback(() => {
-    Alert.alert('Voice', 'Record a voice clip to attach.');
+  const handleVoice = useCallback(async () => {
+    if (isRecording) return;
+    try {
+      if (mediaUri) {
+        setMediaUri(undefined);
+        setMediaType('none');
+      }
+      await startAudioRecording();
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordIntervalRef.current = setInterval(() => {
+        setRecordSeconds(prev => prev + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Audio recording failed:', err);
+      Alert.alert('Microphone Access', err?.message || 'Could not start audio recording.');
+    }
+  }, [isRecording, mediaUri]);
+
+  const handleStopRecording = useCallback(async () => {
+    if (recordIntervalRef.current) {
+      clearInterval(recordIntervalRef.current);
+      recordIntervalRef.current = null;
+    }
+    try {
+      const filePath = await stopAudioRecording();
+      setIsRecording(false);
+      setRecordSeconds(0);
+      if (filePath) {
+        setMediaUri(filePath);
+        setMediaType('audio');
+      }
+    } catch (err: any) {
+      console.error('Failed to stop recording:', err);
+      Alert.alert('Recording Error', err?.message || 'Could not finalize audio recording.');
+      setIsRecording(false);
+      setRecordSeconds(0);
+    }
+  }, []);
+
+  const handleCancelRecording = useCallback(async () => {
+    if (recordIntervalRef.current) {
+      clearInterval(recordIntervalRef.current);
+      recordIntervalRef.current = null;
+    }
+    await cancelAudioRecording().catch(() => {});
+    setIsRecording(false);
+    setRecordSeconds(0);
   }, []);
 
   const removeMedia = useCallback(() => {
+    if (mediaType === 'audio') {
+      cancelAudioRecording().catch(() => {});
+    }
     setMediaUri(undefined);
     setMediaType('none');
-  }, []);
+  }, [mediaType]);
 
 
   const counterColor = useMemo(
@@ -475,6 +543,65 @@ export function CreatePostModal({
         alignItems: 'center',
         justifyContent: 'center',
       },
+      recordingCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: UtilityMethods.wp(3),
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(1.5),
+        marginVertical: UtilityMethods.hp(1),
+      },
+      recordingLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
+      recordingDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#EF4444',
+        marginRight: UtilityMethods.wp(2),
+      },
+      recordingStatusText: {
+        fontSize: FontSize.VALUE(13),
+        fontWeight: '600',
+        color: '#DC2626',
+        marginRight: UtilityMethods.wp(2),
+      },
+      recordingTimerText: {
+        fontSize: FontSize.VALUE(13),
+        fontWeight: '700',
+        color: Colors.textDark,
+      },
+      recordingActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: UtilityMethods.wp(2),
+      },
+      recordingCancelBtn: {
+        paddingHorizontal: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(0.6),
+      },
+      recordingCancelText: {
+        fontSize: FontSize.VALUE(13),
+        color: Colors.textGrey,
+        fontWeight: '500',
+      },
+      recordingDoneBtn: {
+        backgroundColor: Colors.primaryPurple,
+        borderRadius: UtilityMethods.wp(2),
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(0.6),
+      },
+      recordingDoneText: {
+        fontSize: FontSize.VALUE(13),
+        color: Colors.white,
+        fontWeight: '600',
+      },
     }),
   );
 
@@ -582,7 +709,13 @@ export function CreatePostModal({
 
                 {mediaUri && (
                   <View style={styles.mediaPreviewContainer}>
-                    {mediaType === 'image' ? (
+                    {mediaType === 'audio' ? (
+                      <VoiceMemoPlayer
+                        audioUri={mediaUri}
+                        showDelete
+                        onDelete={removeMedia}
+                      />
+                    ) : mediaType === 'image' ? (
                       <Image
                         source={{ uri: mediaUri }}
                         style={styles.mediaPreviewImage}
@@ -604,13 +737,43 @@ export function CreatePostModal({
                         }
                       />
                     )}
-                    <TouchableOpacity
-                      style={styles.removeMediaBtn}
-                      onPress={removeMedia}
-                      hitSlop={8}
-                    >
-                      <CloseIcon size={UtilityMethods.wp(3.5)} color="#FFFFFF" />
-                    </TouchableOpacity>
+                    {mediaType !== 'audio' && (
+                      <TouchableOpacity
+                        style={styles.removeMediaBtn}
+                        onPress={removeMedia}
+                        hitSlop={8}
+                      >
+                        <CloseIcon size={UtilityMethods.wp(3.5)} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {isRecording && (
+                  <View style={styles.recordingCard}>
+                    <View style={styles.recordingLeft}>
+                      <View style={styles.recordingDot} />
+                      <Text style={styles.recordingStatusText}>Recording audio</Text>
+                      <Text style={styles.recordingTimerText}>
+                        {Math.floor(recordSeconds / 60)}:{recordSeconds % 60 < 10 ? '0' : ''}{recordSeconds % 60}
+                      </Text>
+                    </View>
+                    <View style={styles.recordingActions}>
+                      <TouchableOpacity
+                        style={styles.recordingCancelBtn}
+                        onPress={handleCancelRecording}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.recordingCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.recordingDoneBtn}
+                        onPress={handleStopRecording}
+                        activeOpacity={0.75}
+                      >
+                        <Text style={styles.recordingDoneText}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 )}
 

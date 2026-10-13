@@ -11,7 +11,7 @@ import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 import { Colors } from '../../../constants/colors';
 
-interface TextInputFieldProps extends Omit<TextInputProps, 'style'> {
+interface TextInputFieldProps extends TextInputProps {
   label: string;
   placeholder: string;
   leftIconName?: string;
@@ -31,6 +31,7 @@ export function TextInputField({
   leftIcon,
   rightIcon,
   touched,
+  style,
   ...textInputProps
 }: TextInputFieldProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -43,7 +44,7 @@ export function TextInputField({
         <View style={styles.iconLeft}>{leftIcon}</View>
 
         <TextInput
-          style={[styles.input, leftIconName && styles.inputWithIcon]}
+          style={[styles.input, leftIconName && styles.inputWithIcon, style]}
           placeholder={placeholder}
           placeholderTextColor={Colors.placeholderGrey}
           secureTextEntry={secureTextEntry && !isPasswordVisible}

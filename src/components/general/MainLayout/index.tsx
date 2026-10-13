@@ -45,7 +45,7 @@ const MainLayout = ({
   includeSafeArea = true,
   ...props
 }: MainLayoutProps) => {
-  const MainView = showBackGroundImage ? ImageBackground : View;
+  const MainView: any = showBackGroundImage ? ImageBackground : View;
 
   return (
     <MainView

@@ -1,2 +1,25 @@
 {
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/build/**",
+    "**/.gradle/**",
+    "**/android/app/build/**"
+  ],
+  "java.project.resourceFilters": [
+    "node_modules",
+    ".git"
+  ],
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.git/**": true,
+    "**/android/build/**": true,
+    "**/android/.gradle/**": true,
+    "**/android/app/build/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/build": true,
+    "**/.gradle": true
+  }
 }

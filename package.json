@@ -1,6 +1,6 @@
 {
   "name": "NajiyaShade",
-  "version": "0.0.1",
+  "version": "1.0.2",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -15,10 +15,12 @@
     "emulators:stop": "firebase emulators:exec kill"
   },
   "dependencies": {
+    "@invertase/react-native-apple-authentication": "^2.5.1",
     "@react-native-firebase/app": "^25.1.0",
     "@react-native-firebase/auth": "^25.1.0",
     "@react-native-firebase/firestore": "^25.1.0",
     "@react-native-firebase/storage": "^25.1.0",
+    "@react-native-google-signin/google-signin": "^16.1.5",
     "@react-native/new-app-screen": "0.82.0",
     "@react-navigation/bottom-tabs": "^7.15.7",
     "@react-navigation/native": "^7.2.0",

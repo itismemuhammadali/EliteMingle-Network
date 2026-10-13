@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,14 @@ import {
   type ImageSourcePropType,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { NotificationIcon } from '../icons';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
+import { ProfileAvatar } from '../../general/ProfileAvatar';
+import { subscribeToAdminNotifications } from '../../../services/moderationService';
 
 export type AdminHeaderAppearance = 'admin' | 'user';
 
@@ -48,12 +52,58 @@ export function AdminHeader({
   rightSlot,
   rightIcon,
   onRightIconPress,
-  hasNotificationBadge = true,
+  hasNotificationBadge,
   onAvatarPress,
   headerLeft,
   showDivider = true,
 }: AdminHeaderProps) {
   const insets = useSafeAreaInsets();
+  const [dynamicBadge, setDynamicBadge] = useState(false);
+
+  useEffect(() => {
+    if (hasNotificationBadge !== undefined) return;
+    const adminUid = auth().currentUser?.uid;
+    let readSet = new Set<string>();
+    let dismissedSet = new Set<string>();
+    let rawList: any[] = [];
+
+    const recompute = () => {
+      const count = rawList.filter(
+        n => !dismissedSet.has(n.id) && !readSet.has(n.id),
+      ).length;
+      setDynamicBadge(count > 0);
+    };
+
+    const unsubAdmin = subscribeToAdminNotifications(list => {
+      rawList = (list as any[]) || [];
+      recompute();
+    });
+
+    let unsubMeta = () => {};
+    if (adminUid) {
+      unsubMeta = firestore()
+        .collection('users')
+        .doc(adminUid)
+        .collection('meta')
+        .doc('admin_notifications')
+        .onSnapshot(doc => {
+          if (doc && (typeof doc.exists === 'function' ? doc.exists() : doc.exists)) {
+            const data = doc.data() || {};
+            if (Array.isArray(data.readIds)) readSet = new Set(data.readIds);
+            if (Array.isArray(data.dismissedIds)) dismissedSet = new Set(data.dismissedIds);
+          }
+          recompute();
+        });
+    }
+
+    return () => {
+      unsubAdmin();
+      unsubMeta();
+    };
+  }, [hasNotificationBadge]);
+
+  const showBadge =
+    hasNotificationBadge !== undefined ? hasNotificationBadge : dynamicBadge;
   const isUser = appearance === 'user';
   const statusBarHeight = insets.top || 0;
 
@@ -67,7 +117,7 @@ export function AdminHeader({
         size={UtilityMethods.wp(6)}
         color={Colors.adminInactiveGrey}
       />
-      {hasNotificationBadge && <View style={styles.badgeOnBell} />}
+      {showBadge && <View style={styles.badgeOnBell} />}
     </TouchableOpacity>
   );
 
@@ -81,8 +131,13 @@ export function AdminHeader({
     return defaultRightIcon;
   };
 
+  const avatarUri =
+    avatarSource && typeof avatarSource === 'object' && 'uri' in avatarSource
+      ? (avatarSource as { uri?: string }).uri
+      : undefined;
+
   const avatarNode = avatarSource ? (
-    <Image source={avatarSource} style={styles.avatar} />
+    <ProfileAvatar uri={avatarUri} size={UtilityMethods.wp(10)} />
   ) : null;
 
   const leftContent = avatarSource ? (

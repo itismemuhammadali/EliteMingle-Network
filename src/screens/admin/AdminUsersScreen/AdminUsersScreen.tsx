@@ -22,6 +22,8 @@ import UtilityMethods from '../../../utility/UtilityMethods';
 import { useUsersList } from '../../../context/UsersListContext';
 import type { RootStackParamList } from '../../../navigation/MainStack';
 
+import { useLanguage } from '../../../context/LanguageContext';
+
 interface AdminUsersScreenProps {
   onHeaderUpdate?: (subtitle: string) => void;
   onNotificationPress?: () => void;
@@ -33,6 +35,7 @@ export function AdminUsersScreen({
 }: AdminUsersScreenProps) {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList, 'Main'>>();
+  const { t, language } = useLanguage();
   const { users, updateUser, deleteUser } = useUsersList();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -49,12 +52,12 @@ export function AdminUsersScreen({
     const inactive = users.filter(u => u.status === 'inactive').length;
     const pending = users.filter(u => u.status === 'pending').length;
     return [
-      { id: 'all', label: 'All', count: all },
-      { id: 'active', label: 'Active', count: active },
-      { id: 'inactive', label: 'Inactive', count: inactive },
-      { id: 'pending', label: 'Pending', count: pending },
+      { id: 'all', label: t('common.all', 'All'), count: all },
+      { id: 'active', label: t('adminUsers.filterActive', 'Active'), count: active },
+      { id: 'inactive', label: t('adminUsers.filterInactive', 'Inactive'), count: inactive },
+      { id: 'pending', label: t('database.statuses.pending', 'Pending'), count: pending },
     ];
-  }, [users]);
+  }, [users, t]);
 
   const filteredUsers = useMemo(() => {
     let result = users;
@@ -119,10 +122,14 @@ export function AdminUsersScreen({
         contentContainerStyle={styles.content}
       >
         <AdminHeader
-          title="User Management"
-          subtitle={`${displayCount} user${
-            displayCount !== 1 ? 's' : ''
-          } found`}
+          title={t('adminUsers.title', 'Manage Users')}
+          subtitle={`${displayCount} ${
+            language === 'es'
+              ? 'usuarios encontrados'
+              : displayCount !== 1
+              ? 'users found'
+              : 'user found'
+          }`}
           hasNotificationBadge={true}
           onRightIconPress={onNotificationPress}
           rightSlot={
@@ -141,7 +148,7 @@ export function AdminUsersScreen({
         />
 
         <AdminSearchBar
-          placeholder="Search by name or email..."
+          placeholder={t('adminUsers.searchPlaceholder', 'Search by name or email...')}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -158,6 +165,7 @@ export function AdminUsersScreen({
             <UserCard
               key={user.id}
               user={user}
+              onPressCard={u => navigation.navigate('UserDetails', { userId: u.id })}
               onEdit={handleEdit}
               onSuspend={handleSuspend}
               onApprove={handleApprove}

@@ -4,6 +4,7 @@ import auth from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MainLayout from '../../../components/general/MainLayout';
+import { ProfileAvatar } from '../../../components/general/ProfileAvatar';
 import {
   UserMessagesHeader,
   UserMessageSearchBar,
@@ -67,7 +68,7 @@ export function UserMessagesScreen() {
           conversationId: item.id,
           peerId: item.id,
           peerName: item.name,
-          peerAvatarUri: item.avatarUris?.[0] || 'https://i.pravatar.cc/150?img=20',
+          peerAvatarUri: item.avatarUris?.[0] || '',
           statusText: item.memberLabel,
           isOnlineStatus: false,
         });
@@ -90,7 +91,7 @@ export function UserMessagesScreen() {
       navigation.navigate('Chat', {
         peerId: user.id,
         peerName: user.name,
-        peerAvatarUri: user.avatarUri || 'https://i.pravatar.cc/150?img=12',
+        peerAvatarUri: user.avatarUri || '',
         statusText: 'Online',
         isOnlineStatus: true,
       });
@@ -98,17 +99,36 @@ export function UserMessagesScreen() {
     [navigation],
   );
 
-  // 4. Filtered lists computation
+  // 4. Enriched threads and filtered lists computation
+  const enrichedThreads = useMemo(() => {
+    const userMap = new Map(registeredUsers.map(u => [u.id, u]));
+    return activeThreads.map(thread => {
+      if (thread.variant === 'direct') {
+        const pId = thread.peerId || thread.id;
+        const regUser = userMap.get(pId);
+        if (regUser && regUser.name && regUser.name !== 'Anonymous User') {
+          return {
+            ...thread,
+            peerId: pId,
+            name: regUser.name,
+            avatarUri: thread.avatarUri || regUser.avatarUri || '',
+          };
+        }
+      }
+      return thread;
+    });
+  }, [activeThreads, registeredUsers]);
+
   const filteredThreads = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return activeThreads;
-    return activeThreads.filter(t => t.name.toLowerCase().includes(q));
-  }, [activeThreads, searchQuery]);
+    if (!q) return enrichedThreads;
+    return enrichedThreads.filter(t => t.name.toLowerCase().includes(q));
+  }, [enrichedThreads, searchQuery]);
 
   const filteredNewUsers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const existingPeerIds = new Set(
-      activeThreads
+      enrichedThreads
         .map(t => (t.variant === 'direct' ? t.peerId || t.id : ''))
         .filter(Boolean),
     );
@@ -116,7 +136,7 @@ export function UserMessagesScreen() {
     const available = registeredUsers.filter(u => !existingPeerIds.has(u.id));
     if (!q) return available;
     return available.filter(u => u.name.toLowerCase().includes(q));
-  }, [activeThreads, registeredUsers, searchQuery]);
+  }, [enrichedThreads, registeredUsers, searchQuery]);
 
   const renderThreadItem = useCallback(
     ({ item }: { item: UserMessageListItem }) => {
@@ -180,9 +200,9 @@ export function UserMessagesScreen() {
                       onPress={() => openChatWithUser(user)}
                       activeOpacity={0.8}
                     >
-                      <Image
-                        source={{ uri: user.avatarUri || 'https://i.pravatar.cc/150?img=12' }}
-                        style={styles.userAvatar}
+                      <ProfileAvatar
+                        uri={user.avatarUri}
+                        size={UtilityMethods.wp(12.5)}
                       />
                       <View style={styles.userInfo}>
                         <Text style={styles.userName}>{user.name}</Text>

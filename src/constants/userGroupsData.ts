@@ -6,6 +6,8 @@ export type UserGroupMock = {
   memberCount: number;
   /** Pastel background for the large group icon square (grid cards) */
   iconBackgroundColor: string;
+  coverUri?: string;
+  avatarUri?: string;
 };
 
 export type GroupMemberRole = 'Admin' | 'Moderator' | 'Member';

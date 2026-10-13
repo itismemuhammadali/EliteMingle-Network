@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
   useWindowDimensions,
 } from 'react-native';
 import type { UserGroupMock } from '../../constants/userGroupsData';
@@ -44,12 +45,17 @@ export function UserGroupCard({ item, onPress }: UserGroupCardProps) {
         marginBottom: GAP,
       },
       iconSquare: {
-        width: '45%',
-        padding: UtilityMethods.hp(2),
+        width: UtilityMethods.wp(14),
+        height: UtilityMethods.wp(14),
         borderRadius: ICON_TILE_RADIUS,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: UtilityMethods.hp(1.35),
+        overflow: 'hidden',
+      },
+      avatarImg: {
+        width: '100%',
+        height: '100%',
       },
       name: {
         fontSize: FontSize.VALUE(15),
@@ -85,7 +91,15 @@ export function UserGroupCard({ item, onPress }: UserGroupCardProps) {
           { backgroundColor: item.iconBackgroundColor },
         ]}
       >
-        <UserTabGroupsIcon size={UtilityMethods.wp(7)} color={Colors.white} />
+        {item.avatarUri ? (
+          <Image
+            source={{ uri: item.avatarUri }}
+            style={styles.avatarImg}
+            resizeMode="cover"
+          />
+        ) : (
+          <UserTabGroupsIcon size={UtilityMethods.wp(7)} color={Colors.white} />
+        )}
       </View>
       <Text style={styles.name} numberOfLines={2}>
         {item.name}

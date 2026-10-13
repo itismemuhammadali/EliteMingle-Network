@@ -10,7 +10,7 @@ import { ConfirmationModal } from '../../../components/admin/modal';
 import type { NewsPost } from '../../../components/admin/NewsPostCard';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
-import { subscribeToPosts } from '../../../services/postService';
+import { subscribeToPosts, deletePost } from '../../../services/postService';
 import {
   sendWarningToUser,
   setUserStatus,
@@ -21,7 +21,22 @@ export function NewsFeedScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList, 'NewsFeed'>>();
   const [warnModalPost, setWarnModalPost] = useState<NewsPost | null>(null);
   const [blockModalPost, setBlockModalPost] = useState<NewsPost | null>(null);
+  const [deleteModalPost, setDeleteModalPost] = useState<NewsPost | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [posts, setPosts] = useState<NewsPost[]>([]);
+
+  const handleDeletePost = async () => {
+    if (!deleteModalPost) return;
+    try {
+      setDeleting(true);
+      await deletePost(deleteModalPost.id, deleteModalPost.userId, true);
+    } catch (err) {
+      console.warn('Failed to delete post:', err);
+    } finally {
+      setDeleting(false);
+      setDeleteModalPost(null);
+    }
+  };
 
   // All user posts, for moderation (group posts excluded).
   useEffect(() => {
@@ -72,6 +87,7 @@ export function NewsFeedScreen() {
                 }
                 onWarnPress={p => setWarnModalPost(p)}
                 onBlockPress={p => setBlockModalPost(p)}
+                onDeletePress={p => setDeleteModalPost(p)}
               />
             ))
           ) : (
@@ -103,6 +119,13 @@ export function NewsFeedScreen() {
           setBlockModalPost(null);
         }}
         onCancel={() => setBlockModalPost(null)}
+      />
+      <ConfirmationModal
+        visible={!!deleteModalPost}
+        type="deletePost"
+        entityName={deleteModalPost?.userName ?? ''}
+        onConfirm={handleDeletePost}
+        onCancel={() => setDeleteModalPost(null)}
       />
     </MainLayout>
   );

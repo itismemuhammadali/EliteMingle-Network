@@ -10,16 +10,18 @@ interface LanguageAvailableSectionProps {
   items: LanguageOption[];
   selectedId: string;
   onSelect: (item: LanguageOption) => void;
+  sectionTitle?: string;
 }
 
 export function LanguageAvailableSection({
   items,
   selectedId,
   onSelect,
+  sectionTitle = 'Available Languages',
 }: LanguageAvailableSectionProps) {
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.sectionTitle}>Available Languages</Text>
+      <Text style={styles.sectionTitle}>{sectionTitle}</Text>
       {items.map(item => (
         <LanguageListItem
           key={item.id}

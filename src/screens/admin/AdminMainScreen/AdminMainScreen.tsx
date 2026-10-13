@@ -38,7 +38,7 @@ export function AdminMainScreen() {
           />
         );
       case 'Notification':
-        return <AdminNotificationsScreen onBackPress={() => setActiveTab('Home')} />;
+        return <AdminNotificationsScreen />;
       default:
         return (
           <AdminHomeScreen onNotificationPress={goToNotificationsTab} />

@@ -192,6 +192,9 @@ export const subscribeToAdminNotifications = (
             timestamp: formatTimeAgo(x.createdAt),
             isRead: false,
             _s: x.createdAt?.seconds || 0,
+            targetId: x.targetId,
+            targetType: x.targetType || 'post',
+            authorId: x.authorId,
           };
         });
         emit();
@@ -216,6 +219,9 @@ export const subscribeToAdminNotifications = (
             timestamp: formatTimeAgo(x.createdAt),
             isRead: false,
             _s: x.createdAt?.seconds || 0,
+            targetId: id,
+            targetType: 'user',
+            userId: id,
           }));
         emit();
       },
@@ -234,7 +240,10 @@ export interface ReportParams {
   targetId: string;
   /** The author/owner of the reported content, if known. */
   authorId?: string;
+  authorName?: string;
   reason?: string;
+  details?: string;
+  contentSnippet?: string;
 }
 
 /**
@@ -246,7 +255,10 @@ export const reportContent = async (params: ReportParams): Promise<void> => {
     targetType,
     targetId,
     authorId = '',
+    authorName = '',
     reason = 'Inappropriate content',
+    details = '',
+    contentSnippet = '',
   } = params;
   if (!reporterId || !targetId) return;
   await firestore().collection('reports').add({
@@ -254,7 +266,10 @@ export const reportContent = async (params: ReportParams): Promise<void> => {
     targetType,
     targetId,
     authorId,
+    authorName,
     reason,
+    details,
+    contentSnippet,
     status: 'pending',
     createdAt: firestore.FieldValue.serverTimestamp(),
   });

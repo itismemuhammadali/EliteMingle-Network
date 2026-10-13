@@ -16,6 +16,7 @@ interface NotificationCardProps {
   notification: Notification;
   onDismiss: (id: string) => void;
   onMarkAsRead: (id: string) => void;
+  onPress?: (notification: Notification) => void;
 }
 
 const PackageSvgIcon = ({ size, color }: { size?: number; color?: string }) => (
@@ -57,14 +58,24 @@ const TYPE_CONFIG: Record<
   },
 };
 
+import { useLanguage } from '../../../context/LanguageContext';
+import { getLocalizedNotification } from '../../../services/databaseTranslationService';
+
 export function NotificationCard({
   notification,
   onDismiss,
   onMarkAsRead,
+  onPress,
 }: NotificationCardProps) {
-  const config = TYPE_CONFIG[notification.type];
+  const { language } = useLanguage();
+  const config = TYPE_CONFIG[notification.type] || TYPE_CONFIG.user;
   const { IconComponent } = config;
   const iconSize = config.iconSize || UtilityMethods.wp(6);
+
+  const { title, body } = getLocalizedNotification(
+    notification.title,
+    notification.description,
+  );
 
   return (
     <View
@@ -84,7 +95,12 @@ export function NotificationCard({
         />
       </TouchableOpacity>
 
-      <View style={styles.content}>
+      <TouchableOpacity
+        style={styles.content}
+        onPress={() => onPress?.(notification)}
+        activeOpacity={onPress ? 0.75 : 1}
+        disabled={!onPress}
+      >
         <View
           style={[
             styles.iconContainer,
@@ -94,8 +110,8 @@ export function NotificationCard({
           <IconComponent size={iconSize} color={Colors.white} />
         </View>
         <View style={styles.textContent}>
-          <Text style={styles.title}>{notification.title}</Text>
-          <Text style={styles.description}>{notification.description}</Text>
+          <Text style={styles.title}>{title || notification.title}</Text>
+          <Text style={styles.description}>{body || notification.description}</Text>
           <View style={styles.footer}>
             <Text style={styles.timestamp}>{notification.timestamp}</Text>
             {!notification.isRead && (
@@ -103,12 +119,14 @@ export function NotificationCard({
                 onPress={() => onMarkAsRead(notification.id)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.markAsRead}>Mark as read</Text>
+                <Text style={styles.markAsRead}>
+                  {language === 'es' ? 'Marcar como leído' : 'Mark as read'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }

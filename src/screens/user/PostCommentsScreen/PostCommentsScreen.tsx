@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -21,10 +22,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import auth from '@react-native-firebase/auth';
 import type { UserStackParamList } from '../../../navigation/User/types';
 import MainLayout from '../../../components/general/MainLayout';
+import Svg, { Path } from 'react-native-svg';
 import { ChatBackArrowIcon } from '../../../components/user/icons';
 import { Colors } from '../../../constants/colors';
 import { type PostCommentItem } from '../../../constants/postCommentsMockData';
-import { useUserProfile } from '../../../components/user';
+import { useUserProfile, ReportPostModal } from '../../../components/user';
 import {
   addComment,
   subscribeToComments,
@@ -33,6 +35,20 @@ import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
 
 const H_PAD = UtilityMethods.wp(5);
+
+function FlagIcon({ size = 20, color = '#DC2626' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1v18"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 
 function initials(name?: string | null): string {
   const safeName = (name || '').trim();
@@ -50,7 +66,7 @@ export function PostCommentsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
   const route = useRoute<RouteProp<UserStackParamList, 'PostComments'>>();
-  const { postId, authorName } = route.params;
+  const { postId = '', authorName = '' } = route.params || {};
   const { profile } = useUserProfile();
   const insets = useSafeAreaInsets();
 
@@ -58,8 +74,10 @@ export function PostCommentsScreen() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
 
   useEffect(() => {
+    if (!postId) return;
     const unsubscribe = subscribeToComments(postId, list => {
       setComments(list as PostCommentItem[]);
     });
@@ -87,14 +105,18 @@ export function PostCommentsScreen() {
     const text = draft.trim();
     if (!text || sending) return;
     const currentUser = auth().currentUser;
+    if (!currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to post a comment.');
+      return;
+    }
     setSending(true);
     setDraft('');
     try {
       await addComment({
         postId,
-        userId: currentUser?.uid || 'dev_user_123',
+        userId: currentUser.uid,
         authorName:
-          profile?.displayName || currentUser?.displayName || 'User',
+          profile?.displayName || currentUser?.displayName || 'Member',
         avatarUrl: profile?.avatarUri || currentUser?.photoURL || '',
         text,
       });
@@ -126,6 +148,10 @@ export function PostCommentsScreen() {
         fontSize: FontSize.VALUE(18),
         fontWeight: '700',
         color: Colors.textDark,
+      },
+      reportBtn: {
+        padding: UtilityMethods.wp(1),
+        marginLeft: UtilityMethods.wp(2),
       },
       sub: {
         fontSize: FontSize.VALUE(13),
@@ -296,6 +322,15 @@ export function PostCommentsScreen() {
         <Text style={styles.navTitle} numberOfLines={1}>
           Comments
         </Text>
+        <TouchableOpacity
+          onPress={() => setReportModalVisible(true)}
+          hitSlop={12}
+          style={styles.reportBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Report post"
+        >
+          <FlagIcon size={UtilityMethods.wp(5)} />
+        </TouchableOpacity>
       </View>
       <Text style={styles.sub} numberOfLines={1}>
         {`On ${authorName}'s post`}
@@ -343,6 +378,14 @@ export function PostCommentsScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <ReportPostModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        postId={postId}
+        authorName={authorName}
+        onReportSuccess={() => navigation.goBack()}
+      />
     </MainLayout>
   );
 }

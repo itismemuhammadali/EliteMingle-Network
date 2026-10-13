@@ -15,6 +15,7 @@ import {
   ApproveIcon,
   DeleteIcon,
 } from '../icons';
+import { UserTabProfileIcon } from '../../user/icons/UserTabProfileIcon';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
@@ -39,6 +40,7 @@ interface UserCardProps {
   onSuspend?: (user: UserCardData) => void;
   onApprove?: (user: UserCardData) => void;
   onDelete?: (user: UserCardData) => void;
+  onPressCard?: (user: UserCardData) => void;
   style?: ViewStyle;
 }
 
@@ -60,9 +62,15 @@ const STATUS_STYLES: Record<
   },
 };
 
+import { useLanguage } from '../../../context/LanguageContext';
+import {
+  getLocalizedStatus,
+  getLocalizedRole,
+} from '../../../services/databaseTranslationService';
+
 function StatusBadge({ status }: { status: UserStatus }) {
-  const style = STATUS_STYLES[status];
-  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  const style = STATUS_STYLES[status] || STATUS_STYLES.active;
+  const label = getLocalizedStatus(status);
   return (
     <View style={[styles.statusBadge, { backgroundColor: style.bg }]}>
       <Text style={[styles.statusText, { color: style.text }]}>
@@ -78,8 +86,10 @@ export function UserCard({
   onSuspend,
   onApprove,
   onDelete,
+  onPressCard,
   style,
 }: UserCardProps) {
+  const { t } = useLanguage();
   const initials = (user?.name || '')
     .trim()
     .split(' ')
@@ -91,12 +101,17 @@ export function UserCard({
 
   return (
     <View style={[styles.card, style]}>
-      <View style={styles.header}>
+      <TouchableOpacity
+        style={styles.header}
+        onPress={() => onPressCard?.(user)}
+        activeOpacity={0.7}
+        disabled={!onPressCard}
+      >
         <View style={styles.left}>
           <View
             style={[
               styles.avatar,
-              { backgroundColor: user.avatarColor },
+              { backgroundColor: user.avatarColor || Colors.userProfilePurple },
             ]}
           >
             {user.avatarUri ? (
@@ -106,7 +121,7 @@ export function UserCard({
                 resizeMode="cover"
               />
             ) : (
-              <Text style={styles.avatarText}>{initials}</Text>
+              <UserTabProfileIcon size={UtilityMethods.wp(5.5)} color={Colors.white} />
             )}
           </View>
           <View style={styles.details}>
@@ -114,7 +129,7 @@ export function UserCard({
               {user.name}
             </Text>
             <Text style={styles.role} numberOfLines={1}>
-              {user.role}
+              {getLocalizedRole(user.role)}
             </Text>
             <View style={styles.contactRow}>
               <EmailIconSmall size={UtilityMethods.wp(3.5)} color={Colors.adminInactiveGrey} />
@@ -131,7 +146,7 @@ export function UserCard({
           </View>
         </View>
         <StatusBadge status={user.status} />
-      </View>
+      </TouchableOpacity>
 
       <View style={styles.actions}>
         <TouchableOpacity
@@ -140,7 +155,7 @@ export function UserCard({
           activeOpacity={0.7}
         >
           <EditIcon size={UtilityMethods.wp(4)} color="#2563EB" />
-          <Text style={[styles.actionBtnText, styles.editBtnText]}>Edit</Text>
+          <Text style={[styles.actionBtnText, styles.editBtnText]}>{t('common.edit', 'Edit')}</Text>
         </TouchableOpacity>
 
         {user.status === 'pending' ? (
@@ -150,7 +165,7 @@ export function UserCard({
             activeOpacity={0.7}
           >
             <ApproveIcon size={UtilityMethods.wp(4)} color="#059669" />
-            <Text style={[styles.actionBtnText, styles.approveBtnText]}>Approve</Text>
+            <Text style={[styles.actionBtnText, styles.approveBtnText]}>{t('common.confirm', 'Approve')}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -159,7 +174,7 @@ export function UserCard({
             activeOpacity={0.7}
           >
             <SuspendIcon size={UtilityMethods.wp(4)} color="#EA580C" />
-            <Text style={[styles.actionBtnText, styles.suspendBtnText]}>Suspend</Text>
+            <Text style={[styles.actionBtnText, styles.suspendBtnText]}>{t('adminUsers.suspendUser', 'Suspend')}</Text>
           </TouchableOpacity>
         )}
 

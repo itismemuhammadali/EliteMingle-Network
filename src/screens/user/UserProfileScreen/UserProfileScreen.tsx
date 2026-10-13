@@ -19,6 +19,7 @@ import {
   type ProfileTabOption,
 } from '../../../components/user';
 import { useUserProfile } from '../../../components/user/UserProfileContext';
+import { useAppSelector } from '../../../redux/hooks';
 import { subscribeToFriends } from '../../../services/friendService';
 import { subscribeToPosts } from '../../../services/postService';
 import { subscribeToUserGroups } from '../../../services/groupService';
@@ -30,8 +31,8 @@ import {
 } from '../../../constants/userProfileGroupsData';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
-import PencilIcon from '../../../assets/Icons/profile/pencil.svg';
-import GearIcon from '../../../assets/Icons/profile/gear.svg';
+import EditIcon from '../../../assets/Icons/profile/pencil.svg';
+import SettingIcon from '../../../assets/Icons/setting.svg';
 import MicIcon from '../../../assets/Icons/profile/microphone.svg';
 import SpeakerIcon from '../../../assets/Icons/profile/speaker.svg';
 
@@ -48,39 +49,45 @@ export function UserProfileScreen() {
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
   const { profile } = useUserProfile();
   const { openAccessibilityModal } = useAccessibilityModal();
+  const reduxTts = useAppSelector(s => s.ttsEnabled);
+  const reduxVoice = useAppSelector(s => s.voiceCommandsEnabled);
+  const isVoiceActive = reduxVoice ?? !!profile.voiceCommandsEnabled;
+  const isTtsActive = reduxTts ?? !!profile.ttsEnabled;
   const [activeTab, setActiveTab] = useState('posts');
   const [friends, setFriends] = useState<UserFriendListItem[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [profileGroups, setProfileGroups] = useState<UserProfileGroupRow[]>([]);
 
+  const currentUid = auth().currentUser?.uid || '';
+
   // The groups this user belongs to (real data).
   useEffect(() => {
-    const uid = auth().currentUser?.uid || 'dev_user_123';
-    const unsubscribe = subscribeToUserGroups(uid, list => {
+    if (!currentUid) return;
+    const unsubscribe = subscribeToUserGroups(currentUid, list => {
       setProfileGroups(
         list.map(g => ({
           id: g.id,
           name: g.name,
           roleLabel: 'Group member',
-          imageUrl: `https://picsum.photos/seed/${g.id}/240/240`,
+          imageUrl: g.coverUri && String(g.coverUri).startsWith('http') ? g.coverUri : '',
         })),
       );
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUid]);
 
   // Show only the logged-in user's own posts on their profile.
   useEffect(() => {
-    const uid = auth().currentUser?.uid || 'dev_user_123';
+    if (!currentUid) return;
     const unsubscribe = subscribeToPosts(allPosts => {
-      setMyPosts(allPosts.filter(p => p.authorUserId === uid && !p.groupId));
+      setMyPosts(allPosts.filter(p => p.authorUserId === currentUid && !p.groupId));
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUid]);
 
   useEffect(() => {
-    const uid = auth().currentUser?.uid || 'dev_user_123';
-    const unsubscribe = subscribeToFriends(uid, list => {
+    if (!currentUid) return;
+    const unsubscribe = subscribeToFriends(currentUid, list => {
       const mapped: UserFriendListItem[] = list.map(f => ({
         id: f.id,
         name: f.name,
@@ -94,7 +101,7 @@ export function UserProfileScreen() {
       setFriends(mapped);
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUid]);
 
   const tabs = useMemo(() => DEFAULT_PROFILE_TABS, []);
 
@@ -193,19 +200,21 @@ export function UserProfileScreen() {
         backgroundColor: Colors.userProfilePurple,
         borderRadius: UtilityMethods.wp(3),
         paddingVertical: UtilityMethods.hp(1.65),
-        marginRight: UtilityMethods.wp(2),
+        marginRight: UtilityMethods.wp(3),
       },
       editBtnText: {
-        marginLeft: UtilityMethods.wp(2),
+        marginLeft: UtilityMethods.wp(2.5),
         fontSize: FontSize.VALUE(16),
         fontWeight: '700',
         color: Colors.white,
       },
       settingsBtn: {
-        width: UtilityMethods.wp(14),
-        height: UtilityMethods.wp(14),
-        borderRadius: UtilityMethods.wp(2.5),
-        backgroundColor: Colors.inputBackground,
+        width: UtilityMethods.wp(12.5),
+        height: UtilityMethods.wp(12.5),
+        borderRadius: UtilityMethods.wp(6.25),
+        backgroundColor: Colors.white,
+        borderWidth: 1,
+        borderColor: Colors.borderGrey,
         alignItems: 'center',
         justifyContent: 'center',
       },
@@ -225,7 +234,7 @@ export function UserProfileScreen() {
   return (
     <MainLayout
       isScrollable={true}
-      includeSafeArea={true}
+      includeSafeArea={false}
       barStyle="dark-content"
       statusbarBackgrund={Colors.white}
       bottomColor={Colors.userFeedBackground}
@@ -243,7 +252,7 @@ export function UserProfileScreen() {
         />
 
         <UserProfileCoverBlock
-          coverSource={{ uri: profile.coverUri }}
+          coverSource={profile.coverUri ? { uri: profile.coverUri } : null}
           avatarSource={
             profile.avatarUri ? { uri: profile.avatarUri } : null
           }
@@ -254,10 +263,16 @@ export function UserProfileScreen() {
           <Text style={styles.name}>{profile.displayName}</Text>
           <Text style={styles.bio}>{profile.bio}</Text>
 
-          <View style={styles.badges}>
-            <UserProfileBadge label="Voice Enabled" Icon={MicIcon} />
-            <UserProfileBadge label="TTS Active" Icon={SpeakerIcon} />
-          </View>
+          {(isVoiceActive || isTtsActive) && (
+            <View style={styles.badges}>
+              {isVoiceActive && (
+                <UserProfileBadge label="Voice Enabled" Icon={MicIcon} />
+              )}
+              {isTtsActive && (
+                <UserProfileBadge label="TTS Active" Icon={SpeakerIcon} />
+              )}
+            </View>
+          )}
 
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -265,9 +280,9 @@ export function UserProfileScreen() {
               onPress={onEdit}
               activeOpacity={0.88}
             >
-              <PencilIcon
+              <EditIcon
                 width={UtilityMethods.wp(4.5)}
-                height={UtilityMethods.wp(4.5)}
+                height={UtilityMethods.wp(4)}
               />
               <Text style={styles.editBtnText}>Edit Profile</Text>
             </TouchableOpacity>
@@ -278,9 +293,10 @@ export function UserProfileScreen() {
               accessibilityRole="button"
               accessibilityLabel="Settings"
             >
-              <GearIcon
+              <SettingIcon
                 width={UtilityMethods.wp(5.5)}
                 height={UtilityMethods.wp(5.5)}
+                stroke="#000000"
               />
             </TouchableOpacity>
           </View>

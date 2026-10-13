@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,11 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Platform,
+  Alert,
+  StatusBar,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useNavigation,
@@ -17,14 +20,31 @@ import {
 } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { UserStackParamList } from '../../../navigation/User/types';
-import { ChatHeader, MessageBubble, ChatInput } from '../../../components/user';
+import { launchImageLibrary } from 'react-native-image-picker';
+import {
+  ChatHeader,
+  MessageBubble,
+  ChatInput,
+  ChatEmojiPicker,
+} from '../../../components/user';
 import { Colors } from '../../../constants/colors';
 import {
   getOrCreateDirectConversation,
   sendMessage as sendChatMessage,
+  uploadChatImage,
+  uploadChatAudio,
   subscribeToMessages,
   markConversationAsRead,
 } from '../../../services/chatService';
+import {
+  startAudioRecording,
+  stopAudioRecording,
+  cancelAudioRecording,
+} from '../../../services/audioRecorderService';
+import {
+  setCachedAudioUri,
+  setAudioMetadata,
+} from '../../../services/audioCacheService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 
 export type ChatMessage = {
@@ -32,6 +52,8 @@ export type ChatMessage = {
   text: string;
   time: string;
   isOutgoing: boolean;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'audio';
 };
 
 const SEED_MESSAGES: ChatMessage[] = [
@@ -68,35 +90,75 @@ export function ChatScreen() {
   const insets = useSafeAreaInsets();
 
   const {
-    peerId,
-    peerName,
+    peerId = '',
+    peerName = 'User',
     peerAvatarUri,
     conversationId: initialConvId,
     statusText = 'Online',
     isOnlineStatus = true,
-  } = route.params;
+  } = route.params || {};
 
+  const [currentPeerName, setCurrentPeerName] = useState<string>(
+    peerName && peerName !== 'Anonymous User' ? peerName : 'User',
+  );
+  const [currentPeerAvatar, setCurrentPeerAvatar] = useState<string | undefined>(peerAvatarUri);
   const [activeConvId, setActiveConvId] = useState<string | undefined>(initialConvId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Drop the bottom safe-area padding while the keyboard is up (the keyboard
-  // already covers that area) so there's no dead gap above it.
+  // Dynamically resolve the peer's true name and avatar from Firestore
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () =>
-      setKeyboardOpen(true),
-    );
-    const hide = Keyboard.addListener('keyboardDidHide', () =>
-      setKeyboardOpen(false),
-    );
+    if (!peerId) return;
+    const unsub = firestore()
+      .collection('users')
+      .doc(peerId)
+      .onSnapshot(docSnap => {
+        const isExisting =
+          docSnap &&
+          (typeof (docSnap as any).exists === 'function'
+            ? (docSnap as any).exists()
+            : (docSnap as any).exists);
+        if (isExisting) {
+          const data = docSnap.data();
+          const fullName = data?.fullName || data?.displayName || data?.name;
+          if (fullName && fullName !== 'Anonymous User') {
+            setCurrentPeerName(fullName);
+          } else if (data?.email && (!fullName || fullName === 'Anonymous User')) {
+            const emailName = data.email.split('@')[0];
+            setCurrentPeerName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
+          }
+          const avatar = data?.profilePicture || data?.avatarUri || data?.avatarUrl;
+          if (avatar) {
+            setCurrentPeerAvatar(avatar);
+          }
+        }
+      });
+    return () => unsub();
+  }, [peerId]);
+
+  // Listen to keyboard events to drop safe-area padding while keyboard is up on both platforms.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, () => {
+      setShowEmojiPicker(false);
+      setKeyboardOpen(true);
+    });
+    const hide = Keyboard.addListener(hideEvent, () => {
+      setKeyboardOpen(false);
+    });
     return () => {
       show.remove();
       hide.remove();
     };
   }, []);
 
-  const currentUserId = auth().currentUser?.uid || 'temp_current_user';
+  const currentUserId = auth().currentUser?.uid || '';
 
   // Initialize conversation and subscribe to real-time messages
   useEffect(() => {
@@ -109,8 +171,8 @@ export function ChatScreen() {
       if (!convId && currentUserId && peerId) {
         try {
           convId = await getOrCreateDirectConversation(currentUserId, peerId, {
-            name: peerName,
-            avatarUri: peerAvatarUri,
+            name: currentPeerName,
+            avatarUri: currentPeerAvatar,
           });
           if (isMounted) {
             setActiveConvId(convId);
@@ -120,7 +182,7 @@ export function ChatScreen() {
         }
       }
 
-      if (convId && isMounted) {
+      if (convId && isMounted && currentUserId) {
         // Mark unread messages as read
         markConversationAsRead(convId, currentUserId);
 
@@ -139,7 +201,7 @@ export function ChatScreen() {
         unsubscribe();
       }
     };
-  }, [initialConvId, currentUserId, peerId, peerName, peerAvatarUri]);
+  }, [initialConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar]);
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -150,6 +212,10 @@ export function ChatScreen() {
     if (!t) {
       return;
     }
+    if (!currentUserId) {
+      Alert.alert('Sign In Required', 'Please sign in to send messages.');
+      return;
+    }
 
     setDraft('');
 
@@ -157,8 +223,8 @@ export function ChatScreen() {
     if (!convId && currentUserId && peerId) {
       try {
         convId = await getOrCreateDirectConversation(currentUserId, peerId, {
-          name: peerName,
-          avatarUri: peerAvatarUri,
+          name: currentPeerName,
+          avatarUri: currentPeerAvatar,
         });
         setActiveConvId(convId);
       } catch (err) {
@@ -186,7 +252,151 @@ export function ChatScreen() {
       };
       setMessages(prev => [...prev, msg]);
     }
-  }, [draft, activeConvId, currentUserId, peerId, peerName, peerAvatarUri]);
+  }, [draft, activeConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar]);
+
+  const handleAttach = useCallback(() => {
+    if (!currentUserId) {
+      Alert.alert('Sign In Required', 'Please sign in to send photos.');
+      return;
+    }
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 0.8,
+      },
+      async response => {
+        if (response.didCancel || response.errorCode) return;
+        const asset = response.assets?.[0];
+        if (!asset?.uri) return;
+
+        let convId = activeConvId;
+        if (!convId && currentUserId && peerId) {
+          try {
+            convId = await getOrCreateDirectConversation(currentUserId, peerId, {
+              name: currentPeerName,
+              avatarUri: currentPeerAvatar,
+            });
+            setActiveConvId(convId);
+          } catch (err) {
+            console.error('Error creating conversation for image:', err);
+          }
+        }
+
+        if (convId) {
+          try {
+            const remoteUrl = await uploadChatImage(convId, asset.uri);
+            await sendChatMessage({
+              conversationId: convId,
+              senderId: currentUserId,
+              text: 'Sent a photo',
+              mediaUrl: remoteUrl,
+            });
+          } catch (err) {
+            console.error('Error sending photo message:', err);
+          }
+        }
+      },
+    );
+  }, [activeConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar]);
+
+  const handleToggleEmoji = useCallback(() => {
+    Keyboard.dismiss();
+    setShowEmojiPicker(prev => !prev);
+  }, []);
+
+  const handleSelectEmoji = useCallback((emoji: string) => {
+    setDraft(prev => prev + emoji);
+  }, []);
+
+  const handleBackspaceEmoji = useCallback(() => {
+    setDraft(prev => {
+      if (!prev) return '';
+      const chars = Array.from(prev);
+      chars.pop();
+      return chars.join('');
+    });
+  }, []);
+
+  const handleMicPress = useCallback(async () => {
+    if (isRecording) return;
+    try {
+      setShowEmojiPicker(false);
+      Keyboard.dismiss();
+      await startAudioRecording();
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordSeconds(s => s + 1);
+      }, 1000);
+    } catch (err: any) {
+      console.error('Audio record error:', err);
+      Alert.alert('Microphone Access', err?.message || 'Could not start audio recording.');
+    }
+  }, [isRecording]);
+
+  const handleStopAndSendAudio = useCallback(async () => {
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    try {
+      const localAudioPath = await stopAudioRecording();
+      setIsRecording(false);
+      setRecordSeconds(0);
+
+      if (!localAudioPath) return;
+
+      let convId = activeConvId;
+      if (!convId && currentUserId && peerId) {
+        convId = await getOrCreateDirectConversation(currentUserId, peerId, {
+          name: currentPeerName,
+          avatarUri: currentPeerAvatar,
+        });
+        setActiveConvId(convId);
+      }
+
+      if (convId) {
+        const remoteUrl = await uploadChatAudio(convId, localAudioPath);
+        setCachedAudioUri(remoteUrl, localAudioPath);
+        if (recordSeconds > 0) {
+          setAudioMetadata(remoteUrl, recordSeconds);
+          setAudioMetadata(localAudioPath, recordSeconds);
+        }
+        await sendChatMessage({
+          conversationId: convId,
+          senderId: currentUserId,
+          text: 'Sent a voice memo',
+          mediaUrl: remoteUrl,
+          mediaType: 'audio',
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to send voice memo:', err);
+      Alert.alert('Recording Error', err?.message || 'Could not send audio.');
+      setIsRecording(false);
+      setRecordSeconds(0);
+    }
+  }, [activeConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar]);
+
+  const handleCancelAudio = useCallback(async () => {
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    await cancelAudioRecording().catch(() => {});
+    setIsRecording(false);
+    setRecordSeconds(0);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) {
+        clearInterval(recordTimerRef.current);
+      }
+      cancelAudioRecording().catch(() => {});
+    };
+  }, []);
 
   const listData = useMemo(() => [...messages].reverse(), [messages]);
 
@@ -196,6 +406,8 @@ export function ChatScreen() {
         text={item.text}
         time={item.time}
         isOutgoing={item.isOutgoing}
+        mediaUrl={item.mediaUrl}
+        mediaType={item.mediaType}
       />
     ),
     [],
@@ -203,23 +415,36 @@ export function ChatScreen() {
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
 
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44,
+  );
+
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <ChatHeader
-        peerName={peerName}
-        peerAvatarUri={peerAvatarUri}
-        statusText={statusText}
-        isOnlineStatus={isOnlineStatus}
-        onBackPress={handleBack}
+    <View style={styles.root}>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={Colors.white}
+        translucent={Platform.OS === 'android'}
       />
+      <View style={{ backgroundColor: Colors.white, paddingTop: topInset }}>
+        <ChatHeader
+          peerName={currentPeerName}
+          peerAvatarUri={currentPeerAvatar || ''}
+          statusText={statusText}
+          isOnlineStatus={isOnlineStatus}
+          onBackPress={handleBack}
+        />
+      </View>
 
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
       >
         {listData.length > 0 ? (
           <FlatList
+            style={styles.flex}
             data={listData}
             inverted
             keyExtractor={keyExtractor}
@@ -231,17 +456,38 @@ export function ChatScreen() {
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              No messages yet. Say hi to {peerName}! 👋
+              No messages yet. Say hi to {currentPeerName}!
             </Text>
           </View>
         )}
 
-        <View style={{ paddingBottom: keyboardOpen ? 0 : insets.bottom }}>
+        <View
+          style={{
+            paddingBottom: keyboardOpen ? 0 : insets.bottom,
+          }}
+        >
           <ChatInput
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={t => {
+              setDraft(t);
+              if (showEmojiPicker) setShowEmojiPicker(false);
+            }}
             onSend={handleSend}
+            onAttachPress={handleAttach}
+            onEmojiPress={handleToggleEmoji}
+            onMicPress={handleMicPress}
+            isRecording={isRecording}
+            recordingSeconds={recordSeconds}
+            onCancelRecording={handleCancelAudio}
+            onStopAndSendRecording={handleStopAndSendAudio}
           />
+
+          {showEmojiPicker && (
+            <ChatEmojiPicker
+              onSelectEmoji={handleSelectEmoji}
+              onBackspace={handleBackspaceEmoji}
+            />
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>

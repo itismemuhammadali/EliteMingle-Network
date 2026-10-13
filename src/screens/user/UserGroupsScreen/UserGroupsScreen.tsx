@@ -28,7 +28,7 @@ export function UserGroupsScreen() {
   const { profile } = useUserProfile();
   const [groups, setGroups] = useState<UserGroupMock[]>([]);
   const [discover, setDiscover] = useState<UserGroupMock[]>([]);
-  const currentUserId = auth().currentUser?.uid || 'dev_user_123';
+  const currentUserId = auth().currentUser?.uid || '';
 
   const headerDisplayName = profile.displayName
     ? profile.displayName.length > 12
@@ -37,6 +37,7 @@ export function UserGroupsScreen() {
     : 'User';
 
   useEffect(() => {
+    if (!currentUserId) return;
     const unsubMine = subscribeToUserGroups(currentUserId, setGroups);
     const unsubDiscover = subscribeToDiscoverGroups(currentUserId, setDiscover);
     return () => {
@@ -86,7 +87,7 @@ export function UserGroupsScreen() {
   return (
     <MainLayout
       isScrollable={false}
-      includeSafeArea={true}
+      includeSafeArea={false}
       barStyle="dark-content"
       statusbarBackgrund={Colors.userFeedBackground}
       bottomColor={Colors.userFeedBackground}

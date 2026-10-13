@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,15 @@ import SparklesIcon from '../../assets/Icons/Sparkles.svg';
 import WhiteSparklesIcon from '../../assets/Icons/whiteSparkles.svg';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
-import { setSimplifiedUi, setFontScale } from '../../redux/roleSlice';
+import {
+  setSimplifiedUi,
+  setFontScale,
+  setTtsEnabled,
+  setVoiceCommandsEnabled,
+  setBciEnabled,
+} from '../../redux/roleSlice';
+import { saveAccessibilitySettings } from '../../services/accessibilityPersistenceService';
+import { useUserProfile } from './UserProfileContext';
 
 const FONT_OPTIONS: { label: string; value: number; size: number }[] = [
   { label: 'A', value: -2, size: 14 },
@@ -123,11 +131,54 @@ export function AccessibilityModal({
 }: AccessibilityModalProps) {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
+  const { updateProfile } = useUserProfile();
   const simplified = useAppSelector(s => s.simplifiedUi);
   const fontScale = useAppSelector(s => s.fontScale);
-  const [tts, setTts] = useState(false);
-  const [voice, setVoice] = useState(false);
-  const [bci, setBci] = useState(false);
+  const tts = useAppSelector(s => s.ttsEnabled);
+  const voice = useAppSelector(s => s.voiceCommandsEnabled);
+  const bci = useAppSelector(s => s.bciEnabled);
+
+  const handleFontScale = useCallback(
+    (scale: number) => {
+      dispatch(setFontScale(scale));
+      saveAccessibilitySettings({ fontScale: scale });
+    },
+    [dispatch],
+  );
+
+  const handleTtsChange = useCallback(
+    (val: boolean) => {
+      dispatch(setTtsEnabled(val));
+      updateProfile({ ttsEnabled: val });
+      saveAccessibilitySettings({ ttsEnabled: val });
+    },
+    [dispatch, updateProfile],
+  );
+
+  const handleVoiceChange = useCallback(
+    (val: boolean) => {
+      dispatch(setVoiceCommandsEnabled(val));
+      updateProfile({ voiceCommandsEnabled: val });
+      saveAccessibilitySettings({ voiceCommandsEnabled: val });
+    },
+    [dispatch, updateProfile],
+  );
+
+  const handleSimplifiedChange = useCallback(
+    (val: boolean) => {
+      dispatch(setSimplifiedUi(val));
+      saveAccessibilitySettings({ simplifiedUi: val });
+    },
+    [dispatch],
+  );
+
+  const handleBciChange = useCallback(
+    (val: boolean) => {
+      dispatch(setBciEnabled(val));
+      saveAccessibilitySettings({ bciEnabled: val });
+    },
+    [dispatch],
+  );
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
       root: {
@@ -339,7 +390,7 @@ export function AccessibilityModal({
                         active && styles.fontChipActive,
                         i === FONT_OPTIONS.length - 1 && { marginRight: 0 },
                       ]}
-                      onPress={() => dispatch(setFontScale(opt.value))}
+                      onPress={() => handleFontScale(opt.value)}
                       activeOpacity={0.85}
                     >
                       <Text
@@ -364,7 +415,7 @@ export function AccessibilityModal({
               title="Text-to-Speech"
               subtitle="Read content aloud"
               value={tts}
-              onValueChange={setTts}
+              onValueChange={handleTtsChange}
               activeTrack="#CE93D8"
             />
             <OptionRow
@@ -374,7 +425,7 @@ export function AccessibilityModal({
               title="Voice Commands"
               subtitle="Control with voice"
               value={voice}
-              onValueChange={setVoice}
+              onValueChange={handleVoiceChange}
               activeTrack="#90CAF9"
             />
             <OptionRow
@@ -384,7 +435,7 @@ export function AccessibilityModal({
               title="Simplified UI"
               subtitle="Easier navigation"
               value={simplified}
-              onValueChange={v => dispatch(setSimplifiedUi(v))}
+              onValueChange={handleSimplifiedChange}
               activeTrack="#F48FB1"
             />
             <OptionRow
@@ -394,7 +445,7 @@ export function AccessibilityModal({
               title="BCI Integration"
               subtitle="Easier navigation"
               value={bci}
-              onValueChange={setBci}
+              onValueChange={handleBciChange}
               activeTrack="#F48FB1"
             />
           </ScrollView>

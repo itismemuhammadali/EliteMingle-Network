@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { CameraIcon } from '../admin/icons';
+import { UserTabProfileIcon } from './icons/UserTabProfileIcon';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
@@ -88,7 +89,7 @@ export function UserEditProfileAvatarSection({
               resizeMode="cover"
             />
           ) : (
-            <Text style={styles.avatarInitials}>{initials}</Text>
+            <UserTabProfileIcon size={AV * 0.55} color={Colors.white} />
           )}
         </View>
         <TouchableOpacity

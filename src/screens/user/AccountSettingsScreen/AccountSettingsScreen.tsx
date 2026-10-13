@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import {
   subscribeToNotificationSettings,
@@ -72,7 +73,7 @@ export function AccountSettingsScreen() {
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
   const insets = useSafeAreaInsets();
   const { profile } = useUserProfile();
-  const currentUserId = auth().currentUser?.uid || 'dev_user_123';
+  const currentUserId = auth().currentUser?.uid || '';
 
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(true);
@@ -81,6 +82,7 @@ export function AccountSettingsScreen() {
 
   // Load persisted notification preferences (default: all on).
   useEffect(() => {
+    if (!currentUserId) return;
     const unsubscribe = subscribeToNotificationSettings(currentUserId, s => {
       if (s.email !== undefined) setEmailNotif(s.email);
       if (s.push !== undefined) setPushNotif(s.push);
@@ -175,13 +177,32 @@ export function AccountSettingsScreen() {
 
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
-  const onConfirmDeleteAccount = useCallback(() => {
+  const onConfirmDeleteAccount = useCallback(async () => {
     setDeleteAccountOpen(false);
-    Alert.alert(
-      'Account deleted',
-      'Your account deletion request has been submitted.',
-    );
-  }, []);
+    const currentUser = auth().currentUser;
+    if (!currentUser) return;
+    const uid = currentUser.uid;
+
+    try {
+      // 1. Delete user record in Firestore
+      await firestore().collection('users').doc(uid).delete();
+      // 2. Delete user account in Firebase Auth
+      await currentUser.delete();
+      // 3. Trigger sign out from local state
+      await signOut();
+      Alert.alert('Account Deleted', 'Your account has been permanently removed.');
+    } catch (error: any) {
+      console.error('Account deletion error:', error);
+      if (error.code === 'auth/requires-recent-login') {
+        Alert.alert(
+          'Re-authentication Required',
+          'For security purposes, deleting your account requires a recent sign-in. Please log out, sign back in, and try again.',
+        );
+      } else {
+        Alert.alert('Error', error.message || 'Could not delete your account. Please try again.');
+      }
+    }
+  }, [signOut]);
 
   const styles = useUserFontStyles(() =>
     StyleSheet.create({

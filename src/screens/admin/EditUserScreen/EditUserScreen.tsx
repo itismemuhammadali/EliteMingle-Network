@@ -52,7 +52,7 @@ export function EditUserScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList, 'EditUser'>>();
   const route = useRoute<RouteProp<RootStackParamList, 'EditUser'>>();
-  const { userId } = route.params;
+  const { userId = '' } = route.params || {};
   const { users, updateUser } = useUsersList();
 
   const user = useMemo(

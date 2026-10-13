@@ -113,34 +113,38 @@ export function PeopleYouMayKnowSection({ filter }: PeopleYouMayKnowSectionProps
 
           // The current user's own interests, for the Interests filter.
           const myDoc = snapshot.docs.find(d => d.id === currentUid);
+          const myData = myDoc?.data() || {};
+          const rawMyInterests = (myData.interests || myData.selectedInterests || []) as string[];
           const myInterests = new Set(
-            ((myDoc?.data()?.interests as string[]) || []).map(x =>
-              String(x).toLowerCase(),
-            ),
+            rawMyInterests.map(x => String(x).toLowerCase()),
           );
 
           const usersList: SuggestedPerson[] = snapshot.docs
-            .filter(doc => doc.id !== currentUid)
+            .filter(doc => {
+              if (doc.id === currentUid) return false;
+              const data = doc.data();
+              const role = (data.role || '').toLowerCase();
+              return role !== 'admin';
+            })
             .map(doc => {
               const data = doc.data();
-              const name = data.fullName || data.displayName || data.name || 'User';
-              const interests = data.interests || ['Community', 'Social'];
+              const name = data.fullName || data.displayName || data.name || 'Member';
+              const rawInterests = (data.interests || data.selectedInterests || []) as string[];
+              const interests = rawInterests.length > 0 ? rawInterests : ['Community'];
               // If the user has no interests set, don't hide everyone — show all.
               const interestsMatch =
                 myInterests.size === 0 ||
-                (interests as string[]).some(x =>
-                  myInterests.has(String(x).toLowerCase()),
-                );
+                interests.some(x => myInterests.has(String(x).toLowerCase()));
               return {
                 id: doc.id,
                 name,
-                location: data.location || 'San Francisco, CA',
-                bio: data.bio || 'Active Community Member',
-                avatarUrl: data.profilePicture || data.avatarUri || data.avatarUrl || 'https://i.pravatar.cc/150?img=12',
-                mutualFriendsCount: 5,
+                location: data.location || data.city || 'Community Member',
+                bio: data.bio || 'Member of EPM4LIFE',
+                avatarUrl: data.profilePicture || data.avatarUri || data.avatarUrl || '',
+                mutualFriendsCount: 0,
                 interests,
-                isOnline: true,
-                nearby: true,
+                isOnline: data.status === 'Active',
+                nearby: !!data.location,
                 interestsMatch,
               };
             });

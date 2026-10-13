@@ -10,17 +10,21 @@ export type UserProfileState = {
   coverUri: string;
   /** Remote or file URI; `null` shows initials on purple in the profile header. */
   avatarUri: string | null;
+  voiceCommandsEnabled?: boolean;
+  ttsEnabled?: boolean;
 };
 
 /** Default profile — also used to seed `UserProfileProvider`. */
 export const DEFAULT_USER_PROFILE: UserProfileState = {
-  displayName: 'Najjiyah Shade',
-  email: 'your@email.com',
-  phone: '+1 (555) 123-4567',
-  location: 'New York, NY',
-  bio: 'Creative person who loves art, books, and making new friends! 🎨📚',
-  coverUri: 'https://picsum.photos/seed/najprofilecover/1200/600',
-  avatarUri: 'https://i.pravatar.cc/400?img=47',
+  displayName: 'User',
+  email: '',
+  phone: '',
+  location: '',
+  bio: '',
+  coverUri: '',
+  avatarUri: null,
+  voiceCommandsEnabled: false,
+  ttsEnabled: false,
 };
 
 /** @deprecated Use `DEFAULT_USER_PROFILE` or `useUserProfile().profile` */

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Share,
 } from 'react-native';
 import {
   useNavigation,
@@ -55,7 +56,7 @@ export function GroupDetailScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
   const route = useRoute<RouteProp<UserStackParamList, 'GroupDetail'>>();
-  const { groupId } = route.params;
+  const { groupId = '' } = route.params || {};
   const { profile } = useUserProfile();
 
   const [activeTab, setActiveTab] = useState('posts');
@@ -65,9 +66,13 @@ export function GroupDetailScreen() {
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
 
-  const currentUserId = auth().currentUser?.uid || 'dev_user_123';
+  const currentUserId = auth().currentUser?.uid || '';
 
   useEffect(() => {
+    if (!groupId) {
+      setLoading(false);
+      return;
+    }
     const unsubDetail = subscribeToGroupDetail(groupId, currentUserId, g => {
       setGroup(g);
       setLoading(false);
@@ -92,6 +97,10 @@ export function GroupDetailScreen() {
 
   const handleToggleMembership = useCallback(() => {
     if (!group) return;
+    if (!currentUserId) {
+      Alert.alert('Sign In Required', 'Please sign in to join groups.');
+      return;
+    }
     if (group.isMember) {
       Alert.alert('Leave group', `Leave ${group.name}?`, [
         { text: 'Cancel', style: 'cancel' },
@@ -134,9 +143,20 @@ export function GroupDetailScreen() {
     }
   }, [group, navigation]);
 
+  const handleShareGroup = useCallback(() => {
+    if (!group) return;
+    Share.share({
+      message: `Join our group "${group.name}" on EPM4LIFE!`,
+    }).catch(console.error);
+  }, [group]);
+
   const handlePostToGroup = useCallback(async () => {
     const text = draft.trim();
     if (!text || posting) return;
+    if (!currentUserId) {
+      Alert.alert('Sign In Required', 'Please sign in to post to this group.');
+      return;
+    }
     const currentUser = auth().currentUser;
     setPosting(true);
     setDraft('');
@@ -362,8 +382,12 @@ export function GroupDetailScreen() {
         </View>
 
         <UserProfileCoverBlock
-          coverSource={{ uri: group.coverUri }}
-          avatarSource={{ uri: group.avatarUri }}
+          coverSource={
+            group.coverUri ? { uri: group.coverUri } : null
+          }
+          avatarSource={
+            group.avatarUri ? { uri: group.avatarUri } : null
+          }
           avatarShape="roundedSquare"
         />
 
@@ -408,7 +432,7 @@ export function GroupDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.iconBtn}
-              onPress={() => Alert.alert('Share', 'Share this group')}
+              onPress={handleShareGroup}
               accessibilityRole="button"
               accessibilityLabel="Share group"
             >
