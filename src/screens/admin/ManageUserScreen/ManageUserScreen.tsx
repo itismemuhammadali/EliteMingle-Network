@@ -40,7 +40,6 @@ const FilledHeartIcon = ({ size = 24, color = '#F44336' }: { size?: number; colo
     />
   </Svg>
 );
-import { MOCK_USERS } from '../../../constants/mockData';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
@@ -59,7 +58,6 @@ export function ManageUserScreen() {
 
   const { users, updateUser, deleteUser } = useUsersList();
   const contextUser = users.find(u => u.id === userId);
-  const mockUser = MOCK_USERS.find(u => u.id === userId);
   const [firestoreUser, setFirestoreUser] = useState<any>(null);
 
   useEffect(() => {
@@ -91,7 +89,7 @@ export function ManageUserScreen() {
         })
         .catch(err => console.warn('Fetch user doc error:', err));
     }
-  }, [userId, contextUser, mockUser]);
+  }, [userId, contextUser]);
 
   const user = React.useMemo(() => {
     if (contextUser) {
@@ -110,8 +108,8 @@ export function ManageUserScreen() {
       };
     }
     if (firestoreUser) return firestoreUser;
-    return mockUser || null;
-  }, [contextUser, firestoreUser, mockUser]);
+    return null;
+  }, [contextUser, firestoreUser]);
 
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);

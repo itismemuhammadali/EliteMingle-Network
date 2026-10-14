@@ -1,10 +1,11 @@
-import React from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthStack } from './Admin/AuthStack';
 import { useAuth } from '../context/AuthContext';
 import { UsersListProvider } from '../context/UsersListContext';
 import { useAppSelector } from '../redux/hooks';
+import { SplashScreenView } from '../components/general/SplashScreenView';
 import {
   AdminMainScreen,
   NewsFeedScreen,
@@ -49,13 +50,18 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function MainStack() {
   const { user, loading, isEmailVerified, isProfileCompleted } = useAuth();
   const isAdmin = useAppSelector(state => state.admin);
+  const [splashVisible, setSplashVisible] = useState(true);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#85138C" />
-      </View>
-    );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSplashVisible(false);
+    }, 2200);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading || splashVisible) {
+    return <SplashScreenView />;
   }
 
   return (

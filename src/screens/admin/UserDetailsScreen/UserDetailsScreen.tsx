@@ -22,7 +22,6 @@ import {
   CommentIcon,
   ShieldIcon,
 } from '../../../components/admin/icons';
-import { MOCK_USERS } from '../../../constants/mockData';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
@@ -41,7 +40,6 @@ export function UserDetailsScreen() {
 
   const { users } = useUsersList();
   const contextUser = users.find(u => u.id === userId);
-  const mockUser = MOCK_USERS.find(u => u.id === userId);
   const [firestoreUser, setFirestoreUser] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -71,7 +69,7 @@ export function UserDetailsScreen() {
         })
         .catch(err => console.warn('Fetch user doc error:', err));
     }
-  }, [userId, contextUser, mockUser]);
+  }, [userId, contextUser]);
 
   const user = React.useMemo(() => {
     if (contextUser) {
@@ -88,8 +86,8 @@ export function UserDetailsScreen() {
       };
     }
     if (firestoreUser) return firestoreUser;
-    return mockUser || null;
-  }, [contextUser, firestoreUser, mockUser]);
+    return null;
+  }, [contextUser, firestoreUser]);
 
   if (!user) {
     return null;

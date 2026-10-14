@@ -5,6 +5,7 @@ import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import { ChatBackArrowIcon } from './icons';
 import { ProfileAvatar } from '../general/ProfileAvatar';
+import DotsVertical from '../../assets/Icons/profile/dotsVertical.svg';
 
 const AV = UtilityMethods.wp(11);
 
@@ -16,6 +17,7 @@ export interface ChatHeaderProps {
   /** When true, status uses online green; when false, uses muted grey (e.g. member count). */
   isOnlineStatus?: boolean;
   onBackPress: () => void;
+  onOptionsPress?: () => void;
 }
 
 export function ChatHeader({
@@ -24,6 +26,7 @@ export function ChatHeader({
   statusText = 'Online',
   isOnlineStatus = true,
   onBackPress,
+  onOptionsPress,
 }: ChatHeaderProps) {
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
@@ -69,6 +72,10 @@ export function ChatHeader({
         color: Colors.placeholderGrey,
         fontWeight: '400',
       },
+      optionsBtn: {
+        padding: UtilityMethods.wp(1.5),
+        marginLeft: UtilityMethods.wp(2),
+      },
     }),
   );
 
@@ -103,6 +110,18 @@ export function ChatHeader({
           {statusText}
         </Text>
       </View>
+
+      {onOptionsPress && (
+        <TouchableOpacity
+          style={styles.optionsBtn}
+          onPress={onOptionsPress}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Chat options"
+        >
+          <DotsVertical width={22} height={22} color={Colors.textDark} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

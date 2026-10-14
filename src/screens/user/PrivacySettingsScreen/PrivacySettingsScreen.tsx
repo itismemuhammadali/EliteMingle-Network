@@ -61,10 +61,8 @@ export function PrivacySettingsScreen() {
   }, [navigation]);
 
   const onViewPolicy = useCallback(() => {
-    Linking.openURL('https://example.com/privacy').catch(() =>
-      Alert.alert('Privacy Policy', 'Policy would open here.'),
-    );
-  }, []);
+    navigation.navigate('LegalDocument', { documentType: 'privacy' });
+  }, [navigation]);
 
   const styles = useUserFontStyles(() =>
     StyleSheet.create({

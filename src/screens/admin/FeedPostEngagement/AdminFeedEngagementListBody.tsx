@@ -13,12 +13,7 @@ import firestore from '@react-native-firebase/firestore';
 import type { RootStackParamList } from '../../../navigation/MainStack';
 import MainLayout from '../../../components/general/MainLayout';
 import { ScreenHeader } from '../../../components/general/ScreenHeader';
-import { MOCK_NEWS_POSTS } from '../../../constants/mockData';
-import {
-  getFeedEngagementPeople,
-  type FeedEngagementKind,
-  type FeedEngagementPerson,
-} from '../../../constants/adminFeedEngagementMock';
+import type { FeedEngagementKind, FeedEngagementPerson } from '../../../constants/adminFeedEngagementMock';
 import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
@@ -138,19 +133,9 @@ export function AdminFeedEngagementListBody({ postId, kind }: Props) {
     }
   }, [postId, kind]);
 
-  const mockPost = useMemo(
-    () => MOCK_NEWS_POSTS.find(p => p.id === postId),
-    [postId],
-  );
+  const post = livePost;
 
-  const post = livePost || mockPost;
-
-  const mockPeople = useMemo(
-    () => getFeedEngagementPeople(postId, kind),
-    [postId, kind],
-  );
-
-  const people = livePost ? livePeople : (livePeople.length > 0 ? livePeople : mockPeople);
+  const people = livePeople;
 
   const onRowPress = useCallback(
     (userId: string) => {

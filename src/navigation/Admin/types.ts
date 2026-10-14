@@ -8,4 +8,5 @@ export type AuthStackParamList = {
   CreateNewPassword: undefined;
   SignUp: undefined;
   CompleteProfile: undefined;
+  LegalDocument?: { documentType?: 'terms' | 'privacy' | 'eula' };
 };

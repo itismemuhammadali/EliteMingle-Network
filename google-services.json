@@ -1,0 +1,82 @@
+{
+  "project_info": {
+    "project_number": "909617000261",
+    "project_id": "exceptionalpeoplemingle",
+    "storage_bucket": "exceptionalpeoplemingle.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909617000261:android:3ec02b3deef496d545982c",
+        "android_client_info": {
+          "package_name": "com.epm4life.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "909617000261-6pssmc2n1uc54thmi22e4ivuoq2r6ts8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exceptionalpeoplemingle.epm"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909617000261:android:cacb18aa1305196545982c",
+        "android_client_info": {
+          "package_name": "com.exceptionalpeoplemingle.epm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBVKO2RuUzHI4W0p50FIjBX3lFEOZEvUEI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "909617000261-6pssmc2n1uc54thmi22e4ivuoq2r6ts8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.exceptionalpeoplemingle.epm"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -20,6 +20,8 @@ import {
   type ProfileTabOption,
 } from '../../../components/user';
 import ArrowLeftIcon from '../../../assets/Icons/arrowLeft.svg';
+import DotsVertical from '../../../assets/Icons/profile/dotsVertical.svg';
+import { blockUser, reportContent } from '../../../services/moderationService';
 import { Colors } from '../../../constants/colors';
 import { getPublicUserProfile } from '../../../constants/publicUserProfilesData';
 import type { PublicProfileFriendRow } from '../../../constants/publicUserProfilesData';
@@ -204,6 +206,90 @@ export function OtherUserProfileScreen() {
     .slice(0, 2)
     .toUpperCase();
 
+  const submitProfileReport = useCallback(
+    async (reason: string) => {
+      if (currentUserId && userId) {
+        await reportContent({
+          reporterId: currentUserId,
+          targetId: userId,
+          targetType: 'user',
+          reason,
+        });
+        Alert.alert(
+          'Report Submitted',
+          'Thank you for reporting this profile. Our moderation team reviews all reports within 24 hours. Accounts violating our community guidelines will be penalized.',
+        );
+      }
+    },
+    [currentUserId, userId],
+  );
+
+  const handleProfileOptions = useCallback(() => {
+    Alert.alert(
+      displayName || 'User Profile',
+      'Select an action',
+      [
+        {
+          text: 'Report Profile',
+          onPress: () => {
+            Alert.alert(
+              'Report User',
+              'Why are you reporting this user?',
+              [
+                {
+                  text: 'Inappropriate Content or Avatar',
+                  onPress: () =>
+                    submitProfileReport('Inappropriate Content or Avatar'),
+                },
+                {
+                  text: 'Harassment or Bullying',
+                  onPress: () =>
+                    submitProfileReport('Harassment or Bullying'),
+                },
+                {
+                  text: 'Fake Account or Impersonation',
+                  onPress: () =>
+                    submitProfileReport('Fake Account or Impersonation'),
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ],
+            );
+          },
+        },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Block User',
+              `Are you sure you want to block ${
+                displayName || 'this user'
+              }? You will no longer receive messages or see their posts.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Block',
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (currentUserId && userId) {
+                      await blockUser(currentUserId, userId);
+                      Alert.alert(
+                        'User Blocked',
+                        `${displayName || 'User'} has been blocked.`,
+                      );
+                      navigation.goBack();
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }, [displayName, currentUserId, userId, submitProfileReport, navigation]);
+
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
@@ -284,6 +370,7 @@ export function OtherUserProfileScreen() {
       navBar: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         paddingHorizontal: H_PAD,
         paddingTop: UtilityMethods.hp(4),
         paddingBottom: UtilityMethods.hp(1.25),
@@ -292,6 +379,9 @@ export function OtherUserProfileScreen() {
         backgroundColor: Colors.white,
       },
       backBtn: {
+        padding: UtilityMethods.wp(0.5),
+      },
+      optionsBtn: {
         padding: UtilityMethods.wp(0.5),
       },
       navTitleWrap: {

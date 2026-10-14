@@ -613,6 +613,24 @@ export function AccountSettingsScreen() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.soloCard}
+          activeOpacity={0.75}
+          onPress={() => navigation.navigate('LegalDocument', { documentType: 'terms' })}
+        >
+          <View style={[styles.iconBox, { backgroundColor: '#EDE9FE' }]}>
+            <ShieldIcon
+              width={ICON_INNER}
+              height={ICON_INNER}
+              color={Colors.primaryPurple}
+            />
+          </View>
+          <View style={styles.cardTextCol}>
+            <Text style={styles.cardTitle}>Terms & Privacy Policy</Text>
+            <Text style={styles.cardSubtitle}>Read EULA, Terms & Privacy guidelines</Text>
+          </View>
+        </TouchableOpacity>
+
         <Text style={[styles.sectionLabelDanger, styles.sectionSpaced]}>
           Danger Zone
         </Text>

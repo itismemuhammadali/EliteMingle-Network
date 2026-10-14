@@ -17,6 +17,7 @@ import { Colors } from '../../../constants/colors';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 import type { AuthStackParamList } from '../../../navigation/Admin/types';
+import { markOnboardingCompleted } from '../../../services/appLaunchService';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const HERO_RATIO = 0.45;
@@ -74,7 +75,9 @@ export function OnboardingScreen() {
 
   const goNext = useCallback(() => {
     if (isLast) {
-      navigation.navigate('SignIn');
+      markOnboardingCompleted().finally(() => {
+        navigation.navigate('SignIn');
+      });
       return;
     }
     setIndex(i => Math.min(i + 1, total - 1));
@@ -88,7 +91,9 @@ export function OnboardingScreen() {
   }, [isFirst]);
 
   const skip = useCallback(() => {
-    navigation.navigate('SignIn');
+    markOnboardingCompleted().finally(() => {
+      navigation.navigate('SignIn');
+    });
   }, [navigation]);
 
   return (

@@ -191,17 +191,46 @@ export function SignUpScreen() {
                   touched={touched.confirmPassword}
                 />
 
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setAgreedToTerms(!agreedToTerms)}
-                >
-                  <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                <View style={styles.checkboxRow}>
+                  <TouchableOpacity
+                    style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}
+                    onPress={() => setAgreedToTerms(!agreedToTerms)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: agreedToTerms }}
+                  >
                     {agreedToTerms && <CheckmarkIcon />}
-                  </View>
+                  </TouchableOpacity>
                   <Text style={styles.checkboxLabel}>
-                    I agree to the Terms of Service and Privacy Policy. I understand that EPM is a safe space for everyone.
+                    I agree to the{' '}
+                    <Text
+                      style={styles.legalLink}
+                      onPress={() =>
+                        navigation.navigate('LegalDocument', { documentType: 'terms' })
+                      }
+                    >
+                      Terms of Service
+                    </Text>
+                    {', '}
+                    <Text
+                      style={styles.legalLink}
+                      onPress={() =>
+                        navigation.navigate('LegalDocument', { documentType: 'eula' })
+                      }
+                    >
+                      EULA
+                    </Text>
+                    {', and '}
+                    <Text
+                      style={styles.legalLink}
+                      onPress={() =>
+                        navigation.navigate('LegalDocument', { documentType: 'privacy' })
+                      }
+                    >
+                      Privacy Policy
+                    </Text>
+                    . I understand that EPM is a safe space for everyone.
                   </Text>
-                </TouchableOpacity>
+                </View>
 
                 <Button
                   title="Create Account"
@@ -297,6 +326,11 @@ const styles = StyleSheet.create({
     fontSize: FontSize.BODY_TEXT - 2,
     color: Colors.textGrey,
     lineHeight: 20,
+  },
+  legalLink: {
+    color: Colors.primaryPurple,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   createButton: {
     width: '100%',

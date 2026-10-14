@@ -52,6 +52,8 @@
 	<string>EPM4LIFE requires photo library access to upload profile pictures and share photos in posts.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>EPM4LIFE needs permission to save images to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>EPM4LIFE requires microphone access to record and send voice messages in chat.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

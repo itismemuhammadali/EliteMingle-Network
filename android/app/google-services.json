@@ -7,20 +7,12 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:909617000261:android:cacb18aa1305196545982c",
+        "mobilesdk_app_id": "1:909617000261:android:3ec02b3deef496d545982c",
         "android_client_info": {
-          "package_name": "com.exceptionalpeoplemingle.epm"
+          "package_name": "com.epm4life.app"
         }
       },
       "oauth_client": [
-        {
-          "client_id": "909617000261-ojt82cj08mk0p2hqlp61need77nn76s4.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.exceptionalpeoplemingle.epm",
-            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
-          }
-        },
         {
           "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
           "client_type": 3
@@ -51,20 +43,12 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:909617000261:android:df19d425c0c67f6845982c",
+        "mobilesdk_app_id": "1:909617000261:android:cacb18aa1305196545982c",
         "android_client_info": {
-          "package_name": "com.najiyashade"
+          "package_name": "com.exceptionalpeoplemingle.epm"
         }
       },
       "oauth_client": [
-        {
-          "client_id": "909617000261-ojt82cj08mk0p2hqlp61need77nn76s4.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.najiyashade",
-            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
-          }
-        },
         {
           "client_id": "909617000261-rcl9ohhhmhmhf15ptervosl9hvf7np23.apps.googleusercontent.com",
           "client_type": 3

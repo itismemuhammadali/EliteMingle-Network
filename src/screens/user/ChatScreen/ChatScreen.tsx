@@ -45,6 +45,7 @@ import {
   setCachedAudioUri,
   setAudioMetadata,
 } from '../../../services/audioCacheService';
+import { blockUser, reportContent } from '../../../services/moderationService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 
 export type ChatMessage = {
@@ -420,6 +421,85 @@ export function ChatScreen() {
     Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44,
   );
 
+  const submitReport = useCallback(
+    async (reason: string) => {
+      if (currentUserId && peerId) {
+        await reportContent({
+          reporterId: currentUserId,
+          targetId: peerId,
+          targetType: 'user',
+          reason,
+        });
+        Alert.alert(
+          'Report Submitted',
+          'Thank you for reporting this user. Our moderation team reviews all reports within 24 hours. Accounts violating our community guidelines will be penalized.',
+        );
+      }
+    },
+    [currentUserId, peerId],
+  );
+
+  const handleChatOptions = useCallback(() => {
+    Alert.alert(
+      currentPeerName,
+      'Select an action',
+      [
+        {
+          text: 'Report User',
+          onPress: () => {
+            Alert.alert(
+              'Report User',
+              'Why are you reporting this user?',
+              [
+                {
+                  text: 'Inappropriate Content',
+                  onPress: () => submitReport('Inappropriate Content'),
+                },
+                {
+                  text: 'Harassment or Bullying',
+                  onPress: () => submitReport('Harassment or Bullying'),
+                },
+                {
+                  text: 'Spam or Fraud',
+                  onPress: () => submitReport('Spam or Fraud'),
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ],
+            );
+          },
+        },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Block User',
+              `Are you sure you want to block ${currentPeerName}? You will no longer receive messages or see their posts.`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Block',
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (currentUserId && peerId) {
+                      await blockUser(currentUserId, peerId);
+                      Alert.alert(
+                        'User Blocked',
+                        `${currentPeerName} has been blocked.`,
+                      );
+                      navigation.goBack();
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }, [currentPeerName, currentUserId, peerId, submitReport, navigation]);
+
   return (
     <View style={styles.root}>
       <StatusBar
@@ -434,6 +514,7 @@ export function ChatScreen() {
           statusText={statusText}
           isOnlineStatus={isOnlineStatus}
           onBackPress={handleBack}
+          onOptionsPress={handleChatOptions}
         />
       </View>
 

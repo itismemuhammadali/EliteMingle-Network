@@ -28,3 +28,5 @@ emulator-data/
 firebase-export-*/
 android/local.properties
 emulator_test.png
+.xcode.env.local
+ios/.xcode.env.local
