@@ -140,35 +140,30 @@ export function NotificationsScreen() {
         backgroundColor: Colors.userFeedBackground,
       },
       navBar: {
-        position: 'relative',
         paddingHorizontal: H_PAD,
-        paddingTop: UtilityMethods.hp(7),
-        paddingBottom: UtilityMethods.hp(1.25),
+        paddingTop: UtilityMethods.hp(1),
+        paddingBottom: UtilityMethods.hp(1.5),
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: Colors.borderGrey,
         backgroundColor: Colors.white,
-        minHeight: UtilityMethods.hp(6.5),
-        justifyContent: 'center',
       },
       navRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
       },
+      leftGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
       backBtn: {
         padding: UtilityMethods.wp(0.5),
-      },
-      navTitleWrap: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: UtilityMethods.wp(28),
+        marginRight: UtilityMethods.wp(3),
       },
       navTitle: {
         fontSize: FontSize.VALUE(18),
         fontWeight: '700',
         color: Colors.textDark,
-        textAlign: 'center',
       },
       markAllBtn: {
         flexDirection: 'row',
@@ -181,7 +176,7 @@ export function NotificationsScreen() {
       },
       markAllText: {
         marginLeft: UtilityMethods.wp(1),
-        fontSize: FontSize.VALUE(10),
+        fontSize: FontSize.VALUE(12),
         fontWeight: '400',
         color: Colors.textGrey,
       },
@@ -213,18 +208,23 @@ export function NotificationsScreen() {
       <View style={styles.root}>
         <View style={styles.navBar}>
           <View style={styles.navRow}>
-            <TouchableOpacity
-              onPress={handleBack}
-              hitSlop={12}
-              style={styles.backBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-            >
-              <ArrowLeftIcon
-                width={UtilityMethods.wp(5.5)}
-                height={UtilityMethods.wp(5.5)}
-              />
-            </TouchableOpacity>
+            <View style={styles.leftGroup}>
+              <TouchableOpacity
+                onPress={handleBack}
+                hitSlop={12}
+                style={styles.backBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+              >
+                <ArrowLeftIcon
+                  width={UtilityMethods.wp(5.5)}
+                  height={UtilityMethods.wp(5.5)}
+                />
+              </TouchableOpacity>
+              <Text style={styles.navTitle} numberOfLines={1}>
+                Notifications
+              </Text>
+            </View>
             <TouchableOpacity
               style={[styles.markAllBtn, allRead && styles.markAllBtnDisabled]}
               onPress={markAllRead}
@@ -246,11 +246,6 @@ export function NotificationsScreen() {
                 Mark all read
               </Text>
             </TouchableOpacity>
-          </View>
-          <View style={styles.navTitleWrap} pointerEvents="none">
-            <Text style={styles.navTitle} numberOfLines={1}>
-              Notifications
-            </Text>
           </View>
         </View>
 

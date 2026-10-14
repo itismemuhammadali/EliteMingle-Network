@@ -97,7 +97,7 @@ export function EditProfileScreen() {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: H_PAD,
-        paddingTop: UtilityMethods.hp(4),
+        paddingTop: UtilityMethods.hp(1),
         paddingBottom: UtilityMethods.hp(1.25),
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: Colors.borderGrey,
@@ -105,13 +105,13 @@ export function EditProfileScreen() {
       },
       backBtn: {
         padding: UtilityMethods.wp(0.5),
+        zIndex: 1,
       },
       navTitleWrap: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'flex-end',
+        justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: UtilityMethods.wp(28),
-        paddingBottom: UtilityMethods.hp(1.25),
       },
       navTitle: {
         fontSize: FontSize.VALUE(18),
