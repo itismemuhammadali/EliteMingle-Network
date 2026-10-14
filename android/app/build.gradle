@@ -94,15 +94,26 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (project.hasProperty('EPM_UPLOAD_STORE_FILE')) {
+                storeFile file(EPM_UPLOAD_STORE_FILE)
+                storePassword EPM_UPLOAD_STORE_PASSWORD
+                keyAlias EPM_UPLOAD_KEY_ALIAS
+                keyPassword EPM_UPLOAD_KEY_PASSWORD
+            } else {
+                storeFile file('epm-upload-key.keystore')
+                storePassword 'epm4life2026'
+                keyAlias 'epm-upload-key'
+                keyPassword 'epm4life2026'
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
