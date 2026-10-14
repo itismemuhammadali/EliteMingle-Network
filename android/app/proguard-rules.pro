@@ -8,3 +8,26 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# React Native
+-keep class com.facebook.react.** { *; }
+-keep class com.facebook.jni.** { *; }
+
+# Async Storage
+-keep class com.reactnativecommunity.asyncstorage.** { *; }
+
+# Firebase
+-dontwarn com.google.firebase.**
+-keep class com.google.firebase.** { *; }
+
+# SVG & Vector Icons
+-keep class com.horcrux.svg.** { *; }
+-keep class com.oblador.vectoricons.** { *; }
+
+# Video
+-keep class com.brentvatne.react.** { *; }
+
+# Keep all native methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
