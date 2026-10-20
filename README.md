@@ -1,7 +1,11 @@
 # 👑 EliteMingle — Exclusive High-Profile Social Discovery, Executive Networking & Private Event Ecosystem
 
 <p align="center">
-  <img src="assets/branding/logo.jpg" alt="EliteMingle Logo" width="180" style="border-radius: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);" />
+  <img src="assets/branding/epm_original_logo.png" alt="Exceptional People Mingle Original Production Logo" width="140" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(0, 16, 94, 0.35); margin: 0 12px;" />
+  <img src="assets/branding/logo.jpg" alt="EliteMingle Platform Architectural Logo" width="140" style="border-radius: 20px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); margin: 0 12px;" />
+</p>
+<p align="center">
+  <em>Left: Original Production Brand Mark (Exceptional People Mingle) &bull; Right: Architectural Platform Identity (EliteMingle)</em>
 </p>
 
 <p align="center">
