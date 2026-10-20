@@ -30,3 +30,7 @@ android/local.properties
 emulator_test.png
 .xcode.env.local
 ios/.xcode.env.local
+*.certSigningRequest
+*.docx
+xcuserdata/
+*.p8

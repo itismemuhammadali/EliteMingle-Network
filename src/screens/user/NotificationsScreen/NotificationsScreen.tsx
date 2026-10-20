@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  Platform,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
@@ -141,7 +142,7 @@ export function NotificationsScreen() {
       },
       navBar: {
         paddingHorizontal: H_PAD,
-        paddingTop: UtilityMethods.hp(1),
+        paddingTop: Platform.OS === 'android' ? UtilityMethods.hp(6.5) : UtilityMethods.hp(1),
         paddingBottom: UtilityMethods.hp(1.5),
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: Colors.borderGrey,
