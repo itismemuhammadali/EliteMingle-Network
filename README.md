@@ -13,6 +13,7 @@
 </p>
 
 <p align="center">
+  <a href="https://apps.apple.com/pk/app/epm4life/id6822449563"><img src="https://img.shields.io/badge/Apple_App_Store-Live_Production-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Apple App Store" /></a>
   <a href="https://play.google.com/store/apps/details?id=com.epm4life.app"><img src="https://img.shields.io/badge/Google_Play-Live_Production-34A853?style=for-the-badge&logo=googleplay&logoColor=white" alt="Google Play Store" /></a>
   <img src="https://img.shields.io/badge/React_Native-0.74+-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React Native" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
