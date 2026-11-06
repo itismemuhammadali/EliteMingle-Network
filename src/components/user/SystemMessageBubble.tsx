@@ -51,3 +51,4 @@ export function SystemMessageBubble({ text, time }: SystemMessageBubbleProps) {
     </View>
   );
 }
+

@@ -40,3 +40,4 @@ export function formatMessageSnippet(msg?: Partial<ChatMessage> | null): string 
   if (msg.postShare) return '🔖 Shared Post';
   return 'Message';
 }
+
