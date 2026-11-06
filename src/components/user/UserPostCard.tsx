@@ -20,9 +20,11 @@ import PostComment from '../../assets/Icons/BlackComment.svg';
 import PostThumbUp from '../../assets/Icons/blackLike.svg';
 import BlackLikeIcon from '../../assets/Icons/blackLike.svg';
 import PurpleLikeIcon from '../../assets/Icons/purpleLike.svg';
+import PostShare from '../../assets/Icons/blackShare.svg';
 import DotsVertical from '../../assets/Icons/profile/dotsVertical.svg';
 import { UserTabProfileIcon } from './icons/UserTabProfileIcon';
 import { PostCardOverflowMenu } from './PostCardOverflowMenu';
+import { PostCardShareMenu } from './PostCardShareMenu';
 import { ReportPostModal } from './ReportPostModal';
 import { VoiceMemoPlayer } from './VoiceMemoPlayer';
 import { PostTtsButton } from './PostTtsButton';
@@ -119,6 +121,7 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
   }, [post.id, currentUserId]);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [imgError, setImgError] = useState(false);
   const isAudio = post.mediaType === 'audio' || !!post.audioUrl;
@@ -475,6 +478,18 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
               </View>
               <Text style={styles.simpBtnText}>Comment</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.simpBtn}
+              activeOpacity={0.75}
+              onPress={() => setShareOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Share"
+            >
+              <View style={styles.simpBtnIcon}>
+                <PostShare width={simpIcon} height={simpIcon} />
+              </View>
+              <Text style={styles.simpBtnText}>Share</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.actionRow}>
@@ -500,6 +515,14 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
               <PostComment width={ACTION_ICON} height={ACTION_ICON} />
               <Text style={styles.actionText}>Comment</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.7}
+              onPress={() => setShareOpen(true)}
+            >
+              <PostShare width={ACTION_ICON} height={ACTION_ICON} />
+              <Text style={styles.actionText}>Share</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -511,6 +534,12 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
         authorName={post.userName}
         postContent={post.content}
         onReportPress={() => setReportOpen(true)}
+      />
+      <PostCardShareMenu
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        postId={post.id}
+        post={post}
       />
       <ReportPostModal
         visible={reportOpen}

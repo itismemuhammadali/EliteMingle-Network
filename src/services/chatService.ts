@@ -201,6 +201,26 @@ export const getOrCreateGroupConversation = async (
   return conversationId;
 };
 
+export interface SharedPostPayload {
+  postId: string;
+  authorName?: string;
+  content?: string;
+  mediaUrl?: string;
+  mediaType?: string;
+}
+
+const extractPostShareFromText = (text?: string): SharedPostPayload | undefined => {
+  if (!text) return undefined;
+  const match = text.match(/(?:epm:\/\/post\/|https:\/\/epm\.app\/post\/)([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return {
+      postId: match[1],
+      authorName: 'Post',
+    };
+  }
+  return undefined;
+};
+
 /**
  * 2. Send a chat message in a conversation thread.
  * Adds message document and atomically updates last message & unread counters.
@@ -213,6 +233,7 @@ export const sendMessage = async ({
   mediaUrl,
   mediaType,
   replyTo,
+  postShare,
 }: {
   conversationId: string;
   senderId: string;
@@ -226,6 +247,7 @@ export const sendMessage = async ({
     senderName: string;
     mediaType?: 'image' | 'audio';
   };
+  postShare?: SharedPostPayload;
 }): Promise<string> => {
   if (!conversationId || !senderId) {
     throw new Error('conversationId and senderId are required.');
@@ -263,6 +285,7 @@ export const sendMessage = async ({
     mediaUrl: mediaUrl || null,
     mediaType: mediaType || (mediaUrl ? 'image' : null),
     replyTo: replyTo || null,
+    postShare: postShare || null,
     createdAt: timestamp,
     readBy: [senderId],
   };
@@ -559,6 +582,8 @@ export const subscribeToMessages = (
             (data.senderId ? userNameCache[data.senderId] : undefined) ||
             '';
 
+          const postShare = data.postShare || extractPostShareFromText(data.text);
+
           return {
             id: doc.id,
             senderId: data.senderId,
@@ -569,6 +594,7 @@ export const subscribeToMessages = (
             mediaUrl: data.mediaUrl || undefined,
             mediaType,
             replyTo: data.replyTo || undefined,
+            postShare: postShare || undefined,
           };
         });
 

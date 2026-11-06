@@ -180,6 +180,7 @@ export const createGroup = async (params: CreateGroupParams): Promise<string> =>
     coverUri: finalCoverUri || '',
     avatarUri: finalAvatarUri || '',
     ownerId,
+    adminIds: [ownerId],
     members: [ownerId],
     memberCount: 1,
     iconBackgroundColor: pickColor(trimmed),
@@ -209,6 +210,7 @@ export interface GroupDetail {
   memberCount: number;
   iconBackgroundColor: string;
   ownerId: string;
+  adminIds: string[];
   privacy: 'public' | 'private';
   isMember: boolean;
   members: GroupMemberProfile[];
@@ -248,6 +250,7 @@ export const subscribeToGroupDetail = (
               memberCount: fallback.memberCount,
               iconBackgroundColor: fallback.iconBackgroundColor,
               ownerId: '',
+              adminIds: [],
               privacy: 'public',
               isMember: false,
               members: fallback.members.map(m => ({
@@ -264,6 +267,9 @@ export const subscribeToGroupDetail = (
         }
         const x = snap.data() || {};
         const memberIds: string[] = (x.members as string[]) || [];
+        const adminIds: string[] = Array.isArray(x.adminIds)
+          ? x.adminIds
+          : x.ownerId ? [x.ownerId] : [];
 
         const members = await Promise.all(
           memberIds.map(async id => {
@@ -271,10 +277,11 @@ export const subscribeToGroupDetail = (
             const u = docExists(uDoc) ? uDoc.data() || {} : {};
             const rawAvatar =
               u.profilePicture || u.avatarUri || u.avatarUrl || '';
+            const isAdmin = adminIds.includes(id) || id === x.ownerId;
             return {
               id,
               name: u.fullName || u.displayName || u.name || 'Member',
-              role: (id === x.ownerId ? 'Admin' : 'Member') as
+              role: (isAdmin ? 'Admin' : 'Member') as
                 | 'Admin'
                 | 'Member',
               avatarUri:
@@ -302,6 +309,7 @@ export const subscribeToGroupDetail = (
           memberCount: x.memberCount || memberIds.length,
           iconBackgroundColor: x.iconBackgroundColor || '#90CAF9',
           ownerId: x.ownerId || '',
+          adminIds,
           privacy: (x.privacy as 'public' | 'private') || 'public',
           isMember: memberIds.includes(currentUserId),
           members,
@@ -453,4 +461,168 @@ export const addMemberToGroup = async (
       updatedAt: firestore.FieldValue.serverTimestamp(),
     });
   });
+};
+
+/**
+ * Appoint a group member as an admin (supports multiple admins).
+ */
+export const makeGroupAdmin = async (
+  groupId: string,
+  targetUserId: string,
+  currentUserId: string,
+): Promise<void> => {
+  if (!groupId || !targetUserId || !currentUserId) {
+    throw new Error('Group ID, target user ID, and current user ID are required.');
+  }
+  const ref = firestore().collection('groups').doc(groupId);
+  const snap = await ref.get();
+  const exists = typeof (snap as any).exists === 'function' ? snap.exists() : snap.exists;
+  if (!exists) throw new Error('Group does not exist.');
+  const data = snap.data() || {};
+  const adminIds: string[] = Array.isArray(data.adminIds)
+    ? data.adminIds
+    : data.ownerId ? [data.ownerId] : [];
+  const isCurrentAdmin = adminIds.includes(currentUserId) || data.ownerId === currentUserId;
+  if (!isCurrentAdmin) {
+    throw new Error('Only group admins can appoint new admins.');
+  }
+  const members = (data.members as string[]) || [];
+  if (!members.includes(targetUserId)) {
+    throw new Error('The user must be a member of the group.');
+  }
+
+  const additions = [targetUserId];
+  if (data.ownerId && !adminIds.includes(data.ownerId)) {
+    additions.push(data.ownerId);
+  }
+
+  await ref.update({
+    adminIds: firestore.FieldValue.arrayUnion(...additions),
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  });
+};
+
+/**
+ * Remove an admin's admin privileges (creator/owner cannot be removed).
+ */
+export const removeGroupAdmin = async (
+  groupId: string,
+  targetUserId: string,
+  currentUserId: string,
+): Promise<void> => {
+  if (!groupId || !targetUserId || !currentUserId) {
+    throw new Error('Group ID, target user ID, and current user ID are required.');
+  }
+  const ref = firestore().collection('groups').doc(groupId);
+  const snap = await ref.get();
+  const exists = typeof (snap as any).exists === 'function' ? snap.exists() : snap.exists;
+  if (!exists) throw new Error('Group does not exist.');
+  const data = snap.data() || {};
+  const adminIds: string[] = Array.isArray(data.adminIds)
+    ? data.adminIds
+    : data.ownerId ? [data.ownerId] : [];
+  const isCurrentAdmin = adminIds.includes(currentUserId) || data.ownerId === currentUserId;
+  if (!isCurrentAdmin) {
+    throw new Error('Only group admins can remove an admin.');
+  }
+  if (targetUserId === data.ownerId) {
+    throw new Error('The group creator cannot be removed as admin.');
+  }
+
+  await ref.update({
+    adminIds: firestore.FieldValue.arrayRemove(targetUserId),
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  });
+};
+
+export interface UpdateGroupDetailsParams {
+  name?: string;
+  description?: string;
+  privacy?: 'public' | 'private';
+  coverUri?: string;
+  avatarUri?: string;
+}
+
+/**
+ * Update group details and settings (Name, Description, Privacy, Cover/Avatar).
+ * Can be performed by any group admin.
+ */
+export const updateGroupDetails = async (
+  groupId: string,
+  currentUserId: string,
+  params: UpdateGroupDetailsParams,
+): Promise<void> => {
+  if (!groupId || !currentUserId) {
+    throw new Error('Group ID and current user ID are required.');
+  }
+  const ref = firestore().collection('groups').doc(groupId);
+  const snap = await ref.get();
+  const exists = typeof (snap as any).exists === 'function' ? snap.exists() : snap.exists;
+  if (!exists) throw new Error('Group does not exist.');
+  const data = snap.data() || {};
+  const adminIds: string[] = Array.isArray(data.adminIds)
+    ? data.adminIds
+    : data.ownerId ? [data.ownerId] : [];
+  const isCurrentAdmin = adminIds.includes(currentUserId) || data.ownerId === currentUserId;
+  if (!isCurrentAdmin) {
+    throw new Error('Only group admins can edit group details.');
+  }
+
+  const updates: Record<string, any> = {
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (params.name !== undefined) {
+    const trimmed = params.name.trim();
+    if (!trimmed) throw new Error('Group name cannot be empty.');
+    updates.name = trimmed;
+  }
+
+  if (params.description !== undefined) {
+    updates.description = params.description.trim();
+  }
+
+  if (params.privacy !== undefined) {
+    updates.privacy = params.privacy;
+  }
+
+  if (params.coverUri !== undefined) {
+    if (params.coverUri && !params.coverUri.startsWith('http')) {
+      updates.coverUri = await uploadGroupCover(groupId, params.coverUri, currentUserId);
+    } else {
+      updates.coverUri = params.coverUri;
+    }
+  }
+
+  if (params.avatarUri !== undefined) {
+    if (params.avatarUri && !params.avatarUri.startsWith('http')) {
+      updates.avatarUri = await uploadGroupAvatar(groupId, params.avatarUri, currentUserId);
+    } else {
+      updates.avatarUri = params.avatarUri;
+    }
+  }
+
+  await ref.update(updates);
+
+  // Sync group name and avatar to conversation if one exists
+  try {
+    const convRef = firestore().collection('conversations').doc(`group_${groupId}`);
+    const convSnap = await convRef.get();
+    const convExists = typeof (convSnap as any).exists === 'function' ? convSnap.exists() : convSnap.exists;
+    if (convExists) {
+      const convUpdates: Record<string, any> = {};
+      if (updates.name) {
+        convUpdates.name = updates.name;
+        convUpdates.groupName = updates.name;
+      }
+      if (updates.avatarUri) {
+        convUpdates.groupAvatar = updates.avatarUri;
+      }
+      if (Object.keys(convUpdates).length > 0) {
+        await convRef.update(convUpdates);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to sync group updates to conversation:', err);
+  }
 };

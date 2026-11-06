@@ -31,11 +31,14 @@ import {
 } from '../../../components/user';
 import ArrowLeftIcon from '../../../assets/Icons/arrowLeft.svg';
 import { Colors } from '../../../constants/colors';
+import { launchImageLibrary } from 'react-native-image-picker';
 import {
   subscribeToGroupDetail,
   joinGroup,
   leaveGroup,
-  transferGroupAdmin,
+  makeGroupAdmin,
+  removeGroupAdmin,
+  updateGroupDetails,
   addMemberToGroup,
   type GroupDetail,
 } from '../../../services/groupService';
@@ -78,7 +81,21 @@ export function GroupDetailScreen() {
   const [allUsers, setAllUsers] = useState<RegisteredUser[]>([]);
   const [userSearch, setUserSearch] = useState('');
 
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPrivacy, setEditPrivacy] = useState<'public' | 'private'>('public');
+  const [editCoverUri, setEditCoverUri] = useState<string | undefined>();
+  const [editAvatarUri, setEditAvatarUri] = useState<string | undefined>();
+  const [savingDetails, setSavingDetails] = useState(false);
+
   const currentUserId = auth().currentUser?.uid || '';
+
+  const isUserAdmin = useMemo(() => {
+    if (!group || !currentUserId) return false;
+    if (group.ownerId === currentUserId) return true;
+    return Array.isArray(group.adminIds) && group.adminIds.includes(currentUserId);
+  }, [group, currentUserId]);
 
   useEffect(() => {
     if (!groupId) {
@@ -140,24 +157,118 @@ export function GroupDetailScreen() {
     [navigation],
   );
 
+  const handleOpenEditModal = useCallback(() => {
+    if (!group) return;
+    setEditName(group.name || '');
+    setEditDescription(group.description || '');
+    setEditPrivacy(group.privacy || 'public');
+    setEditCoverUri(group.coverUri);
+    setEditAvatarUri(group.avatarUri);
+    setEditModalVisible(true);
+  }, [group]);
+
+  const handlePickCover = useCallback(() => {
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, response => {
+      if (response.didCancel || response.errorCode) return;
+      const asset = response.assets?.[0];
+      if (asset?.uri) {
+        setEditCoverUri(asset.uri);
+      }
+    });
+  }, []);
+
+  const handlePickAvatar = useCallback(() => {
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, response => {
+      if (response.didCancel || response.errorCode) return;
+      const asset = response.assets?.[0];
+      if (asset?.uri) {
+        setEditAvatarUri(asset.uri);
+      }
+    });
+  }, []);
+
+  const handleSaveGroupDetails = useCallback(async () => {
+    if (!group || !currentUserId || savingDetails) return;
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      Alert.alert('Required', 'Group name cannot be empty.');
+      return;
+    }
+    setSavingDetails(true);
+    try {
+      await updateGroupDetails(group.id, currentUserId, {
+        name: trimmed,
+        description: editDescription.trim(),
+        privacy: editPrivacy,
+        coverUri: editCoverUri,
+        avatarUri: editAvatarUri,
+      });
+      setEditModalVisible(false);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Group details updated!', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Success', 'Group details updated!');
+      }
+    } catch (err: any) {
+      console.error('Failed to update group details:', err);
+      Alert.alert('Error', err?.message || 'Could not update group details.');
+    } finally {
+      setSavingDetails(false);
+    }
+  }, [group, currentUserId, savingDetails, editName, editDescription, editPrivacy, editCoverUri, editAvatarUri]);
+
   const handleMakeAdmin = useCallback(
     (member: { id: string; name: string }) => {
       if (!group || !currentUserId) return;
       Alert.alert(
-        'Transfer Admin',
-        `Are you sure you want to make ${member.name} the group admin? You will no longer be the owner/admin.`,
+        'Make Admin',
+        `Make ${member.name} an admin of this group? They will be able to edit group details and manage members.`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Make Admin',
+            onPress: async () => {
+              try {
+                await makeGroupAdmin(group.id, member.id, currentUserId);
+                if (Platform.OS === 'android') {
+                  ToastAndroid.show(`${member.name} is now an admin!`, ToastAndroid.SHORT);
+                } else {
+                  Alert.alert('Success', `${member.name} is now an admin.`);
+                }
+              } catch (err: any) {
+                console.error('Failed to make admin:', err);
+                Alert.alert('Error', err?.message || 'Failed to make admin.');
+              }
+            },
+          },
+        ],
+      );
+    },
+    [group, currentUserId],
+  );
+
+  const handleDismissAdmin = useCallback(
+    (member: { id: string; name: string }) => {
+      if (!group || !currentUserId) return;
+      Alert.alert(
+        'Dismiss Admin',
+        `Remove admin privileges from ${member.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Dismiss',
             style: 'destructive',
             onPress: async () => {
               try {
-                await transferGroupAdmin(group.id, member.id, currentUserId);
-                Alert.alert('Success', `${member.name} is now the group admin.`);
+                await removeGroupAdmin(group.id, member.id, currentUserId);
+                if (Platform.OS === 'android') {
+                  ToastAndroid.show(`Removed admin privileges from ${member.name}.`, ToastAndroid.SHORT);
+                } else {
+                  Alert.alert('Success', `Removed admin privileges from ${member.name}.`);
+                }
               } catch (err: any) {
-                console.error('Failed to transfer admin:', err);
-                Alert.alert('Error', err?.message || 'Failed to transfer admin.');
+                console.error('Failed to remove admin:', err);
+                Alert.alert('Error', err?.message || 'Failed to remove admin.');
               }
             },
           },
@@ -334,6 +445,21 @@ export function GroupDetailScreen() {
         justifyContent: 'center',
         marginRight: UtilityMethods.wp(2),
       },
+      editGroupBtn: {
+        paddingHorizontal: UtilityMethods.wp(4),
+        height: UtilityMethods.wp(14),
+        borderRadius: UtilityMethods.wp(2.5),
+        backgroundColor: Colors.white,
+        borderWidth: 1.5,
+        borderColor: Colors.userProfilePurple,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      editGroupBtnText: {
+        fontSize: FontSize.VALUE(14),
+        fontWeight: '700',
+        color: Colors.userProfilePurple,
+      },
       feedArea: {
         paddingTop: UtilityMethods.hp(0.5),
         paddingHorizontal: H_PAD,
@@ -463,6 +589,101 @@ export function GroupDetailScreen() {
         fontSize: FontSize.VALUE(12),
         fontWeight: '700',
       },
+      editModalScroll: {
+        maxHeight: UtilityMethods.hp(60),
+      },
+      editFieldLabel: {
+        fontSize: FontSize.VALUE(13),
+        fontWeight: '700',
+        color: Colors.textDark,
+        marginTop: UtilityMethods.hp(1.5),
+        marginBottom: UtilityMethods.hp(0.6),
+      },
+      editTextInput: {
+        backgroundColor: Colors.inputBackground,
+        borderRadius: UtilityMethods.wp(2.5),
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(1.2),
+        fontSize: FontSize.VALUE(14),
+        color: Colors.textDark,
+      },
+      editTextArea: {
+        minHeight: UtilityMethods.hp(8),
+        textAlignVertical: 'top',
+      },
+      privacyRow: {
+        flexDirection: 'row',
+        gap: UtilityMethods.wp(2),
+        marginTop: UtilityMethods.hp(0.5),
+      },
+      privacyOption: {
+        flex: 1,
+        paddingVertical: UtilityMethods.hp(1.2),
+        borderRadius: UtilityMethods.wp(2.5),
+        borderWidth: 1,
+        borderColor: Colors.borderGrey,
+        alignItems: 'center',
+        backgroundColor: Colors.white,
+      },
+      privacyOptionSelected: {
+        borderColor: Colors.userProfilePurple,
+        backgroundColor: 'rgba(124, 58, 237, 0.08)',
+      },
+      privacyOptionText: {
+        fontSize: FontSize.VALUE(14),
+        fontWeight: '600',
+        color: Colors.textGrey,
+      },
+      privacyOptionTextSelected: {
+        color: Colors.userProfilePurple,
+        fontWeight: '700',
+      },
+      saveBtn: {
+        backgroundColor: Colors.userProfilePurple,
+        borderRadius: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(1.4),
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: UtilityMethods.hp(2.5),
+        marginBottom: UtilityMethods.hp(2),
+      },
+      saveBtnDisabled: {
+        opacity: 0.6,
+      },
+      saveBtnText: {
+        color: Colors.white,
+        fontSize: FontSize.VALUE(15),
+        fontWeight: '700',
+      },
+      imagePickerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: UtilityMethods.wp(3),
+        marginVertical: UtilityMethods.hp(0.8),
+      },
+      imagePreviewBox: {
+        width: UtilityMethods.wp(16),
+        height: UtilityMethods.wp(16),
+        borderRadius: UtilityMethods.wp(2),
+        backgroundColor: Colors.inputBackground,
+        overflow: 'hidden',
+      },
+      imagePreviewImg: {
+        width: '100%',
+        height: '100%',
+      },
+      pickImageBtn: {
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(0.9),
+        borderRadius: UtilityMethods.wp(2),
+        borderWidth: 1,
+        borderColor: Colors.userProfilePurple,
+      },
+      pickImageBtnText: {
+        fontSize: FontSize.VALUE(12),
+        fontWeight: '600',
+        color: Colors.userProfilePurple,
+      },
       missing: {
         flex: 1,
         padding: UtilityMethods.wp(5),
@@ -581,6 +802,17 @@ export function GroupDetailScreen() {
                 color={Colors.textDark}
               />
             </TouchableOpacity>
+            {isUserAdmin ? (
+              <TouchableOpacity
+                style={styles.editGroupBtn}
+                onPress={handleOpenEditModal}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Edit group details"
+              >
+                <Text style={styles.editGroupBtnText}>Edit Group</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           <UserProfileSegmentTabs
@@ -630,7 +862,7 @@ export function GroupDetailScreen() {
         )}
         {activeTab === 'members' && (
           <View style={styles.membersList}>
-            {group.ownerId === currentUserId && (
+            {isUserAdmin && (
               <TouchableOpacity
                 style={styles.addMemberBtn}
                 onPress={() => setAddModalVisible(true)}
@@ -644,13 +876,144 @@ export function GroupDetailScreen() {
                 key={member.id}
                 member={member}
                 onViewPress={onViewMember}
-                canMakeAdmin={group.ownerId === currentUserId && member.id !== currentUserId}
+                canManageAdmins={isUserAdmin}
+                isMemberOwner={member.id === group.ownerId}
+                isCurrentViewer={member.id === currentUserId}
                 onMakeAdminPress={handleMakeAdmin}
+                onDismissAdminPress={handleDismissAdmin}
               />
             ))}
           </View>
         )}
       </View>
+
+      {/* Edit Group Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Group Details</Text>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                hitSlop={10}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.editModalScroll} showsVerticalScrollIndicator={false}>
+              {/* Cover Photo */}
+              <Text style={styles.editFieldLabel}>Group Cover Photo</Text>
+              <View style={styles.imagePickerRow}>
+                <View style={styles.imagePreviewBox}>
+                  {editCoverUri ? (
+                    <Image source={{ uri: editCoverUri }} style={styles.imagePreviewImg} resizeMode="cover" />
+                  ) : null}
+                </View>
+                <TouchableOpacity style={styles.pickImageBtn} onPress={handlePickCover}>
+                  <Text style={styles.pickImageBtnText}>
+                    {editCoverUri ? 'Change Cover' : 'Upload Cover'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Avatar Photo */}
+              <Text style={styles.editFieldLabel}>Group Icon / Avatar</Text>
+              <View style={styles.imagePickerRow}>
+                <View style={[styles.imagePreviewBox, { borderRadius: UtilityMethods.wp(8) }]}>
+                  {editAvatarUri ? (
+                    <Image source={{ uri: editAvatarUri }} style={styles.imagePreviewImg} resizeMode="cover" />
+                  ) : null}
+                </View>
+                <TouchableOpacity style={styles.pickImageBtn} onPress={handlePickAvatar}>
+                  <Text style={styles.pickImageBtnText}>
+                    {editAvatarUri ? 'Change Icon' : 'Upload Icon'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Group Name */}
+              <Text style={styles.editFieldLabel}>Group Name</Text>
+              <TextInput
+                style={styles.editTextInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter group name"
+                placeholderTextColor={Colors.placeholderGrey}
+                maxLength={50}
+              />
+
+              {/* Description */}
+              <Text style={styles.editFieldLabel}>Description</Text>
+              <TextInput
+                style={[styles.editTextInput, styles.editTextArea]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="What is this group about?"
+                placeholderTextColor={Colors.placeholderGrey}
+                multiline
+                numberOfLines={3}
+                maxLength={200}
+              />
+
+              {/* Privacy */}
+              <Text style={styles.editFieldLabel}>Privacy</Text>
+              <View style={styles.privacyRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.privacyOption,
+                    editPrivacy === 'public' && styles.privacyOptionSelected,
+                  ]}
+                  onPress={() => setEditPrivacy('public')}
+                >
+                  <Text
+                    style={[
+                      styles.privacyOptionText,
+                      editPrivacy === 'public' && styles.privacyOptionTextSelected,
+                    ]}
+                  >
+                    Public
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.privacyOption,
+                    editPrivacy === 'private' && styles.privacyOptionSelected,
+                  ]}
+                  onPress={() => setEditPrivacy('private')}
+                >
+                  <Text
+                    style={[
+                      styles.privacyOptionText,
+                      editPrivacy === 'private' && styles.privacyOptionTextSelected,
+                    ]}
+                  >
+                    Private
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[styles.saveBtn, savingDetails && styles.saveBtnDisabled]}
+                onPress={handleSaveGroupDetails}
+                disabled={savingDetails}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.saveBtnText}>
+                  {savingDetails ? 'Saving...' : 'Save Changes'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={addModalVisible}

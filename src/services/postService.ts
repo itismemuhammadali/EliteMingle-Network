@@ -672,3 +672,54 @@ export const subscribeToSavedPosts = (
     });
 };
 
+/**
+ * Real-time subscription to a single post by ID.
+ */
+export const subscribeToPost = (
+  postId: string,
+  onUpdate: (post: any | null) => void,
+) => {
+  if (!postId) {
+    onUpdate(null);
+    return () => {};
+  }
+  return firestore()
+    .collection('posts')
+    .doc(postId)
+    .onSnapshot(
+      async doc => {
+        if (!doc || !(typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists)) {
+          onUpdate(null);
+          return;
+        }
+        const mapped = mapPostDoc(doc);
+        const enriched = await enrichWithAuthorProfiles([mapped]);
+        onUpdate(enriched[0] || null);
+      },
+      error => {
+        console.error('Single post snapshot error:', error);
+        onUpdate(null);
+      },
+    );
+};
+
+/**
+ * Fetch a single post by ID once.
+ */
+export const getPostById = async (postId: string): Promise<any | null> => {
+  if (!postId) return null;
+  try {
+    const doc = await firestore().collection('posts').doc(postId).get();
+    if (!doc || !(typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists)) {
+      return null;
+    }
+    const mapped = mapPostDoc(doc);
+    const enriched = await enrichWithAuthorProfiles([mapped]);
+    return enriched[0] || null;
+  } catch (err) {
+    console.error('getPostById error:', err);
+    return null;
+  }
+};
+
+

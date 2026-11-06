@@ -80,6 +80,13 @@ export type ChatMessage = {
   isOutgoing: boolean;
   mediaUrl?: string;
   mediaType?: 'image' | 'audio';
+  postShare?: {
+    postId: string;
+    authorName?: string;
+    content?: string;
+    mediaUrl?: string;
+    mediaType?: string;
+  };
   replyTo?: {
     id?: string;
     text?: string;
@@ -563,6 +570,16 @@ export function ChatScreen() {
     setSelectedMessage(item);
   }, []);
 
+  const handlePressPost = useCallback(
+    (postId: string, authorName?: string) => {
+      navigation.navigate('PostComments', {
+        postId,
+        authorName: authorName || 'Post',
+      });
+    },
+    [navigation],
+  );
+
   const listData = useMemo(() => [...messages].reverse(), [messages]);
 
   const renderItem = useCallback(
@@ -575,12 +592,14 @@ export function ChatScreen() {
         mediaType={item.mediaType}
         senderName={item.senderName}
         showSenderName={isGroupChat}
+        postShare={item.postShare}
         replyTo={item.replyTo}
         onPressImage={url => setFullScreenImageUrl(url)}
+        onPressPost={handlePressPost}
         onLongPress={() => handleLongPressMessage(item)}
       />
     ),
-    [isGroupChat, handleLongPressMessage],
+    [isGroupChat, handleLongPressMessage, handlePressPost],
   );
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);

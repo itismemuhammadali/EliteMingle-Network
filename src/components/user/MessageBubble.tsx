@@ -16,6 +16,13 @@ export interface MessageBubbleProps {
   mediaType?: 'image' | 'audio';
   senderName?: string;
   showSenderName?: boolean;
+  postShare?: {
+    postId: string;
+    authorName?: string;
+    content?: string;
+    mediaUrl?: string;
+    mediaType?: string;
+  };
   replyTo?: {
     id?: string;
     text?: string;
@@ -23,6 +30,7 @@ export interface MessageBubbleProps {
     mediaType?: 'image' | 'audio';
   };
   onPressImage?: (url: string) => void;
+  onPressPost?: (postId: string, authorName?: string) => void;
   onLongPress?: () => void;
 }
 
@@ -35,8 +43,10 @@ function MessageBubbleComponent({
   mediaType,
   senderName,
   showSenderName,
+  postShare,
   replyTo,
   onPressImage,
+  onPressPost,
   onLongPress,
 }: MessageBubbleProps) {
   const [imgError, setImgError] = useState(false);
@@ -58,10 +68,20 @@ function MessageBubbleComponent({
     mediaType === 'image' ||
     (!!formattedMediaUrl && !isVoiceMemo);
 
-  const showText =
-    text &&
-    text !== 'Sent a voice memo' &&
-    text !== 'Sent a photo';
+  const displayableText = useMemo(() => {
+    if (!text) return '';
+    if (postShare) {
+      const stripped = text
+        .replace(/^Check out this post:\s*/i, '')
+        .replace(/https:\/\/epm\.app\/post\/[^\s]+/g, '')
+        .replace(/epm:\/\/post\/[^\s]+/g, '')
+        .trim();
+      return stripped;
+    }
+    return text !== 'Sent a voice memo' && text !== 'Sent a photo' ? text : '';
+  }, [text, postShare]);
+
+  const showText = !!displayableText;
 
   const imageSource = useMemo(
     () => (formattedMediaUrl && !imgError ? { uri: formattedMediaUrl } : undefined),
@@ -159,6 +179,103 @@ function MessageBubbleComponent({
       bodyOut: {
         color: Colors.white,
       },
+      postShareCard: {
+        borderRadius: UtilityMethods.wp(2.5),
+        overflow: 'hidden',
+        width: UtilityMethods.wp(62),
+        borderWidth: 1,
+        marginBottom: showText ? UtilityMethods.hp(0.8) : 0,
+      },
+      postShareCardIn: {
+        backgroundColor: '#F8F9FA',
+        borderColor: Colors.borderGrey,
+      },
+      postShareCardOut: {
+        backgroundColor: 'rgba(255, 255, 255, 0.18)',
+        borderColor: 'rgba(255, 255, 255, 0.35)',
+      },
+      postShareHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(0.8),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(0,0,0,0.06)',
+      },
+      postShareHeaderOut: {
+        borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+      },
+      postShareBadge: {
+        backgroundColor: Colors.userProfilePurple,
+        paddingHorizontal: UtilityMethods.wp(1.5),
+        paddingVertical: UtilityMethods.hp(0.2),
+        borderRadius: UtilityMethods.wp(1),
+        marginRight: UtilityMethods.wp(1.5),
+      },
+      postShareBadgeOut: {
+        backgroundColor: Colors.white,
+      },
+      postShareBadgeText: {
+        color: Colors.white,
+        fontSize: FontSize.VALUE(9),
+        fontWeight: '800',
+        letterSpacing: 0.5,
+      },
+      postShareBadgeTextOut: {
+        color: Colors.chartMalePurple,
+      },
+      postShareAuthor: {
+        fontSize: FontSize.VALUE(12),
+        fontWeight: '700',
+        flex: 1,
+      },
+      postShareAuthorIn: {
+        color: Colors.textDark,
+      },
+      postShareAuthorOut: {
+        color: Colors.white,
+      },
+      postShareMedia: {
+        width: '100%',
+        height: UtilityMethods.hp(16),
+        backgroundColor: '#E5E7EB',
+      },
+      postShareBody: {
+        paddingHorizontal: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(0.8),
+      },
+      postShareContent: {
+        fontSize: FontSize.VALUE(13),
+        lineHeight: FontSize.VALUE(18),
+      },
+      postShareContentIn: {
+        color: Colors.textDark,
+      },
+      postShareContentOut: {
+        color: 'rgba(255, 255, 255, 0.95)',
+      },
+      postShareFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(0.6),
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(0,0,0,0.06)',
+      },
+      postShareFooterOut: {
+        borderTopColor: 'rgba(255, 255, 255, 0.2)',
+      },
+      postShareViewText: {
+        fontSize: FontSize.VALUE(11),
+        fontWeight: '700',
+      },
+      postShareViewTextIn: {
+        color: Colors.chartMalePurple,
+      },
+      postShareViewTextOut: {
+        color: Colors.white,
+      },
       time: {
         marginTop: UtilityMethods.hp(0.45),
         fontSize: FontSize.VALUE(11),
@@ -190,7 +307,7 @@ function MessageBubbleComponent({
           <View style={styles.audioWrap}>
             <VoiceMemoPlayer audioUri={formattedMediaUrl || mediaUrl!} showDelete={false} />
           </View>
-        ) : showText || (isPhoto && imageSource && !imgError) ? (
+        ) : showText || postShare || (isPhoto && imageSource && !imgError) ? (
           <View
             style={[
               styles.bubble,
@@ -231,6 +348,87 @@ function MessageBubbleComponent({
               </View>
             ) : null}
 
+            {postShare ? (
+              <TouchableOpacity
+                style={[
+                  styles.postShareCard,
+                  isOutgoing ? styles.postShareCardOut : styles.postShareCardIn,
+                ]}
+                activeOpacity={0.88}
+                onPress={() => onPressPost && onPressPost(postShare.postId, postShare.authorName)}
+              >
+                <View
+                  style={[
+                    styles.postShareHeader,
+                    isOutgoing && styles.postShareHeaderOut,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.postShareBadge,
+                      isOutgoing && styles.postShareBadgeOut,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.postShareBadgeText,
+                        isOutgoing && styles.postShareBadgeTextOut,
+                      ]}
+                    >
+                      POST
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.postShareAuthor,
+                      isOutgoing ? styles.postShareAuthorOut : styles.postShareAuthorIn,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {postShare.authorName ? `${postShare.authorName}'s post` : 'Shared Post'}
+                  </Text>
+                </View>
+
+                {postShare.mediaUrl ? (
+                  <Image
+                    source={{ uri: formatStorageUrl(postShare.mediaUrl) || postShare.mediaUrl }}
+                    style={styles.postShareMedia}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                {postShare.content ? (
+                  <View style={styles.postShareBody}>
+                    <Text
+                      style={[
+                        styles.postShareContent,
+                        isOutgoing ? styles.postShareContentOut : styles.postShareContentIn,
+                      ]}
+                      numberOfLines={3}
+                    >
+                      {postShare.content}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View
+                  style={[
+                    styles.postShareFooter,
+                    isOutgoing && styles.postShareFooterOut,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.postShareViewText,
+                      isOutgoing ? styles.postShareViewTextOut : styles.postShareViewTextIn,
+                    ]}
+                  >
+                    View post ›
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
             {isPhoto && imageSource && !imgError ? (
               <TouchableOpacity
                 activeOpacity={0.9}
@@ -249,7 +447,7 @@ function MessageBubbleComponent({
               <Text
                 style={[styles.body, isOutgoing ? styles.bodyOut : styles.bodyIn]}
               >
-                {text}
+                {displayableText}
               </Text>
             ) : null}
           </View>
@@ -274,6 +472,7 @@ export const MessageBubble = React.memo(
       prevProps.mediaType === nextProps.mediaType &&
       prevProps.senderName === nextProps.senderName &&
       prevProps.showSenderName === nextProps.showSenderName &&
+      prevProps.postShare?.postId === nextProps.postShare?.postId &&
       prevProps.replyTo?.id === nextProps.replyTo?.id
     );
   },

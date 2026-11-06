@@ -26,10 +26,12 @@ import Svg, { Path } from 'react-native-svg';
 import { ChatBackArrowIcon } from '../../../components/user/icons';
 import { Colors } from '../../../constants/colors';
 import { type PostCommentItem } from '../../../constants/postCommentsMockData';
-import { useUserProfile, ReportPostModal } from '../../../components/user';
+import type { UserFeedPost } from '../../../constants/userFeedData';
+import { useUserProfile, ReportPostModal, UserPostCard } from '../../../components/user';
 import {
   addComment,
   subscribeToComments,
+  subscribeToPost,
 } from '../../../services/postService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
@@ -71,6 +73,7 @@ export function PostCommentsScreen() {
   const insets = useSafeAreaInsets();
 
   const [comments, setComments] = useState<PostCommentItem[]>([]);
+  const [post, setPost] = useState<UserFeedPost | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -78,10 +81,14 @@ export function PostCommentsScreen() {
 
   useEffect(() => {
     if (!postId) return;
-    const unsubscribe = subscribeToComments(postId, list => {
+    const unsubPost = subscribeToPost(postId, setPost);
+    const unsubComments = subscribeToComments(postId, list => {
       setComments(list as PostCommentItem[]);
     });
-    return () => unsubscribe();
+    return () => {
+      unsubPost();
+      unsubComments();
+    };
   }, [postId]);
 
   useEffect(() => {
@@ -347,6 +354,13 @@ export function PostCommentsScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            post ? (
+              <View style={{ marginBottom: UtilityMethods.hp(1.5), marginTop: UtilityMethods.hp(1) }}>
+                <UserPostCard post={post} embedded />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <Text style={styles.empty}>No comments yet. Be the first!</Text>
           }

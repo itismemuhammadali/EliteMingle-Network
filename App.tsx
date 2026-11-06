@@ -2,7 +2,7 @@ import React from 'react';
 import { StatusBar, useColorScheme, LogBox } from 'react-native';
 
 LogBox.ignoreAllLogs();
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, type LinkingOptions } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { AuthProvider } from './src/context/AuthContext';
@@ -22,6 +22,19 @@ const AdminTheme = {
   },
 };
 
+const linking: LinkingOptions<any> = {
+  prefixes: ['epm://', 'https://epm.app'],
+  config: {
+    screens: {
+      UserMain: {
+        screens: {
+          PostComments: 'post/:postId',
+        },
+      },
+    },
+  },
+};
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
@@ -32,7 +45,7 @@ function App() {
           <AuthProvider>
             <LanguageProvider>
               <UsersListProvider>
-                <NavigationContainer theme={AdminTheme}>
+                <NavigationContainer theme={AdminTheme} linking={linking}>
                   <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
                   <MainStack />
                 </NavigationContainer>
