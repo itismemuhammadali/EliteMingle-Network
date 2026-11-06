@@ -65,9 +65,9 @@ export function QuotedMessagePreview({
   const displaySnippet =
     snippet ||
     (mediaType === 'image'
-      ? '📷 Photo'
+      ? 'Photo'
       : mediaType === 'audio'
-      ? '🎤 Voice memo'
+      ? 'Voice memo'
       : 'Message');
 
   return (
@@ -93,4 +93,3 @@ export function QuotedMessagePreview({
     </View>
   );
 }
-

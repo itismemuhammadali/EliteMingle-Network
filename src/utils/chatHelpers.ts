@@ -29,15 +29,17 @@ export function getParticipantColor(userIdOrName?: string): string {
 }
 
 /**
- * Returns a human-readable snippet for quoted message previews.
+ * Returns a human-readable snippet for quoted message previews (clean, no emojis).
  */
 export function formatMessageSnippet(msg?: Partial<ChatMessage> | null): string {
   if (!msg) return '';
   if (msg.is_deleted) return 'This message was deleted';
-  if (msg.text && msg.text.trim()) return msg.text.trim();
-  if (msg.mediaType === 'image') return '📷 Photo';
-  if (msg.mediaType === 'audio') return '🎤 Voice memo';
-  if (msg.postShare) return '🔖 Shared Post';
+  if (msg.text && msg.text.trim()) {
+    // Strip leading emoji prefixes if any were stored previously
+    return msg.text.replace(/^[📷🎤]\s*/, '').trim();
+  }
+  if (msg.mediaType === 'image') return 'Photo';
+  if (msg.mediaType === 'audio') return 'Voice memo';
+  if (msg.postShare) return 'Shared Post';
   return 'Message';
 }
-

@@ -303,8 +303,8 @@ export const sendMessage = async ({
   if (replyTo && (replyTo.id || replyTo.text)) {
     let snippet = (replyTo.text || '').trim();
     if (!snippet) {
-      if (replyTo.mediaType === 'image') snippet = '📷 Photo';
-      else if (replyTo.mediaType === 'audio') snippet = '🎤 Voice memo';
+      if (replyTo.mediaType === 'image') snippet = 'Photo';
+      else if (replyTo.mediaType === 'audio') snippet = 'Voice memo';
       else snippet = 'Message';
     }
     cleanedReplyTo = {

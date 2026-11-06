@@ -15,6 +15,7 @@ import { VoiceMemoPlayer } from './VoiceMemoPlayer';
 import { SystemMessageBubble } from './SystemMessageBubble';
 import { formatStorageUrl } from '../../services/postService';
 import { getParticipantColor } from '../../utils/chatHelpers';
+import { ReplyIcon } from '../../assets/Icons/ReplyIcon';
 
 const R = UtilityMethods.wp(3.75);
 
@@ -172,16 +173,17 @@ function MessageBubbleComponent({
     [senderId, senderName],
   );
 
-  // Unified quote payload resolution (Req 1)
+  // Unified quote payload resolution (clean, no emojis)
   const quoteId = parent_message_id || replyTo?.id;
   const quoteSender = quoted_sender_name || replyTo?.senderName;
-  const quoteText =
+  const rawQuoteText =
     quoted_snippet ||
     (quoted_media_type === 'image' || replyTo?.mediaType === 'image'
-      ? '📷 Photo'
+      ? 'Photo'
       : quoted_media_type === 'audio' || replyTo?.mediaType === 'audio'
-      ? '🎤 Voice memo'
+      ? 'Voice memo'
       : replyTo?.text);
+  const quoteText = rawQuoteText ? rawQuoteText.replace(/^[📷🎤]\s*/, '').trim() : '';
   const hasQuote = Boolean(!is_deleted && (quoteId || quoteSender || quoteText));
 
   const styles = useUserFontStyles(() =>
@@ -231,6 +233,10 @@ function MessageBubbleComponent({
         paddingVertical: UtilityMethods.hp(1.25),
         maxWidth: '100%',
       },
+      bubbleWithQuote: {
+        minWidth: UtilityMethods.wp(58),
+        maxWidth: '100%',
+      },
       bubbleIn: {
         backgroundColor: Colors.white,
         borderWidth: 1,
@@ -262,14 +268,17 @@ function MessageBubbleComponent({
         color: Colors.userProfilePurple,
       },
       replyQuoteBox: {
+        width: '100%',
+        alignSelf: 'stretch',
         flexDirection: 'row',
         borderRadius: UtilityMethods.wp(2),
-        paddingVertical: UtilityMethods.hp(0.6),
-        paddingHorizontal: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(0.8),
+        paddingHorizontal: UtilityMethods.wp(2.8),
         marginBottom: UtilityMethods.hp(0.8),
+        overflow: 'hidden',
       },
       replyQuoteBoxIn: {
-        backgroundColor: '#F3F4F6',
+        backgroundColor: '#F1F5F9',
         borderLeftWidth: 3.5,
         borderLeftColor: Colors.chartMalePurple,
       },
@@ -278,8 +287,13 @@ function MessageBubbleComponent({
         borderLeftWidth: 3.5,
         borderLeftColor: Colors.white,
       },
+      replyQuoteContent: {
+        flex: 1,
+        minWidth: 0,
+        justifyContent: 'center',
+      },
       replyQuoteSender: {
-        fontSize: FontSize.VALUE(11.5),
+        fontSize: FontSize.VALUE(12),
         fontWeight: '700',
         marginBottom: UtilityMethods.hp(0.2),
       },
@@ -290,13 +304,14 @@ function MessageBubbleComponent({
         color: Colors.white,
       },
       replyQuoteText: {
-        fontSize: FontSize.VALUE(12),
+        fontSize: FontSize.VALUE(12.5),
+        lineHeight: FontSize.VALUE(17),
       },
       replyQuoteTextIn: {
         color: Colors.textDark,
       },
       replyQuoteTextOut: {
-        color: 'rgba(255, 255, 255, 0.9)',
+        color: 'rgba(255, 255, 255, 0.95)',
       },
       audioWrap: {
         width: UtilityMethods.wp(68),
@@ -481,6 +496,17 @@ function MessageBubbleComponent({
     );
   };
 
+  const replyIconOpacity = translateX.interpolate({
+    inputRange: [0, 10, 35],
+    outputRange: [0, 0.4, 1],
+    extrapolate: 'clamp',
+  });
+  const replyIconScale = translateX.interpolate({
+    inputRange: [0, 10, 35],
+    outputRange: [0.3, 0.6, 1],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={[styles.wrap, isOutgoing ? styles.wrapOut : styles.wrapIn]}>
       {/* Group Participant Name (Req 7) */}
@@ -492,14 +518,23 @@ function MessageBubbleComponent({
 
       {/* Swipeable & Touchable Bubble Container */}
       <View style={styles.swipeContainer} {...panResponder.panHandlers}>
-        <View style={styles.swipeReplyIcon}>
-          <Text style={styles.swipeReplyIconText}>↩</Text>
-        </View>
+        <Animated.View
+          style={[
+            styles.swipeReplyIcon,
+            {
+              opacity: replyIconOpacity,
+              transform: [{ scale: replyIconScale }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <ReplyIcon size={14} color={Colors.white} />
+        </Animated.View>
 
         <Animated.View style={{ transform: [{ translateX }] }}>
           <TouchableOpacity
             activeOpacity={0.88}
-            onLongPress={onLongPress}
+            onLongPress={is_deleted ? undefined : onLongPress}
             delayLongPress={300}
           >
             {/* Deleted Message Placeholder (Req 3) */}
@@ -516,7 +551,7 @@ function MessageBubbleComponent({
                     isOutgoing ? styles.deletedTextOut : styles.deletedTextIn,
                   ]}
                 >
-                  🚫 This message was deleted
+                  This message was deleted
                 </Text>
               </View>
             ) : isVoiceMemo && (formattedMediaUrl || mediaUrl) ? (
@@ -530,7 +565,7 @@ function MessageBubbleComponent({
                       isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
                     ]}
                   >
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.replyQuoteContent}>
                       <Text
                         style={[
                           styles.replyQuoteSender,
@@ -538,7 +573,7 @@ function MessageBubbleComponent({
                         ]}
                         numberOfLines={1}
                       >
-                        {quoteSender || 'Replied Message'}
+                        {quoteSender || 'Message'}
                       </Text>
                       <Text
                         style={[
@@ -547,7 +582,7 @@ function MessageBubbleComponent({
                         ]}
                         numberOfLines={2}
                       >
-                        {quoteText}
+                        {quoteText || 'Message'}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -559,6 +594,7 @@ function MessageBubbleComponent({
                 style={[
                   styles.bubble,
                   isOutgoing ? styles.bubbleOut : styles.bubbleIn,
+                  hasQuote && styles.bubbleWithQuote,
                 ]}
               >
                 {/* Quoted block inside message bubble (Req 1) */}
@@ -571,7 +607,7 @@ function MessageBubbleComponent({
                       isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
                     ]}
                   >
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.replyQuoteContent}>
                       <Text
                         style={[
                           styles.replyQuoteSender,
@@ -579,7 +615,7 @@ function MessageBubbleComponent({
                         ]}
                         numberOfLines={1}
                       >
-                        {quoteSender || 'Replied Message'}
+                        {quoteSender || 'Message'}
                       </Text>
                       <Text
                         style={[
@@ -588,7 +624,7 @@ function MessageBubbleComponent({
                         ]}
                         numberOfLines={2}
                       >
-                        {quoteText}
+                        {quoteText || 'Message'}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -699,9 +735,8 @@ function MessageBubbleComponent({
         </Animated.View>
       </View>
 
-      {/* Timestamp, Edited & Star indicator */}
+      {/* Timestamp & Edited indicator */}
       <View style={[styles.timeRow, isOutgoing ? styles.timeRowOut : styles.timeRowIn]}>
-        {isStarred ? <Text style={styles.starIcon}>⭐</Text> : null}
         {is_edited ? <Text style={styles.editedLabel}>edited</Text> : null}
         <Text style={styles.time}>{time}</Text>
       </View>

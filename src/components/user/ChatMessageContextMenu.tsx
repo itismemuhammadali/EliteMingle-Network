@@ -10,6 +10,8 @@ import {
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
+import { ReplyIcon } from '../../assets/Icons/ReplyIcon';
+import TrashIcon from '../../assets/Icons/profile/accountSettings/trash.svg';
 import type { ChatMessage } from '../../screens/user/ChatScreen/ChatScreen';
 
 export interface ChatMessageContextMenuProps {
@@ -18,17 +20,15 @@ export interface ChatMessageContextMenuProps {
   currentUserId: string;
   isGroupAdmin: boolean;
   onClose: () => void;
-  onCopy: (message: ChatMessage) => void;
   onReply: (message: ChatMessage) => void;
-  onStar: (message: ChatMessage) => void;
-  onForward: (message: ChatMessage) => void;
-  onInfo: (message: ChatMessage) => void;
-  onEdit: (message: ChatMessage) => void;
-  onDeleteForMe: (message: ChatMessage) => void;
   onDeleteForEveryone: (message: ChatMessage) => void;
+  onCopy?: (message: ChatMessage) => void;
+  onStar?: (message: ChatMessage) => void;
+  onForward?: (message: ChatMessage) => void;
+  onInfo?: (message: ChatMessage) => void;
+  onEdit?: (message: ChatMessage) => void;
+  onDeleteForMe?: (message: ChatMessage) => void;
 }
-
-const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 export function ChatMessageContextMenu({
   visible,
@@ -36,13 +36,7 @@ export function ChatMessageContextMenu({
   currentUserId,
   isGroupAdmin,
   onClose,
-  onCopy,
   onReply,
-  onStar,
-  onForward,
-  onInfo,
-  onEdit,
-  onDeleteForMe,
   onDeleteForEveryone,
 }: ChatMessageContextMenuProps) {
   const styles = useUserFontStyles(() =>
@@ -59,7 +53,6 @@ export function ChatMessageContextMenu({
         paddingTop: UtilityMethods.hp(1.5),
         paddingBottom: UtilityMethods.hp(3.5),
         paddingHorizontal: UtilityMethods.wp(4),
-        maxHeight: UtilityMethods.hp(75),
       },
       handleBar: {
         width: UtilityMethods.wp(10),
@@ -72,33 +65,33 @@ export function ChatMessageContextMenu({
       previewSnippet: {
         backgroundColor: '#F8FAFC',
         borderRadius: UtilityMethods.wp(2.5),
-        paddingHorizontal: UtilityMethods.wp(3),
-        paddingVertical: UtilityMethods.hp(0.8),
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(1),
         marginBottom: UtilityMethods.hp(1.5),
-        borderLeftWidth: 3,
+        borderLeftWidth: 3.5,
         borderLeftColor: Colors.userProfilePurple,
       },
       previewSender: {
-        fontSize: FontSize.VALUE(11.5),
+        fontSize: FontSize.VALUE(12),
         fontWeight: '700',
         color: Colors.userProfilePurple,
-        marginBottom: UtilityMethods.hp(0.15),
+        marginBottom: UtilityMethods.hp(0.2),
       },
       previewText: {
-        fontSize: FontSize.VALUE(12.5),
+        fontSize: FontSize.VALUE(13),
         color: Colors.textDark,
       },
       actionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: UtilityMethods.hp(1.2),
+        paddingVertical: UtilityMethods.hp(1.4),
         paddingHorizontal: UtilityMethods.wp(2),
       },
-      actionIcon: {
-        fontSize: UtilityMethods.wp(4.8),
-        marginRight: UtilityMethods.wp(3.5),
-        width: UtilityMethods.wp(6),
-        textAlign: 'center',
+      actionIconBox: {
+        width: UtilityMethods.wp(7),
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: UtilityMethods.wp(3),
       },
       actionLabel: {
         fontSize: FontSize.VALUE(15),
@@ -111,13 +104,13 @@ export function ChatMessageContextMenu({
       divider: {
         height: StyleSheet.hairlineWidth,
         backgroundColor: Colors.borderGrey,
-        marginVertical: UtilityMethods.hp(0.5),
+        marginVertical: UtilityMethods.hp(0.4),
       },
       cancelBtn: {
-        marginTop: UtilityMethods.hp(1),
+        marginTop: UtilityMethods.hp(1.5),
         backgroundColor: '#F1F5F9',
         borderRadius: UtilityMethods.wp(3),
-        paddingVertical: UtilityMethods.hp(1.3),
+        paddingVertical: UtilityMethods.hp(1.4),
         alignItems: 'center',
         justifyContent: 'center',
       },
@@ -133,26 +126,20 @@ export function ChatMessageContextMenu({
 
   const isOwn = message.isOutgoing || message.senderId === currentUserId;
   const isDeleted = !!message.is_deleted;
-  const isTextMsg =
-    Boolean(message.text) &&
-    message.text !== 'Sent a photo' &&
-    message.text !== 'Sent a voice memo';
-
-  // Check 15-minute edit window for own text messages
-  const msgTime = message.createdAtMs || 0;
-  const canEdit =
-    isOwn &&
-    !isDeleted &&
-    isTextMsg &&
-    (msgTime === 0 || Date.now() - msgTime <= EDIT_WINDOW_MS);
 
   // Delete for everyone allowed if own message OR group admin
   const canDeleteForEveryone = !isDeleted && (isOwn || isGroupAdmin);
 
-  // Check if currently starred by this user
-  const isStarred = Boolean(
-    message.starred_by && message.starred_by.includes(currentUserId),
-  );
+  const previewSnippetText = isDeleted
+    ? 'This message was deleted'
+    : message.text ||
+      (message.mediaType === 'image'
+        ? 'Photo'
+        : message.mediaType === 'audio'
+        ? 'Voice memo'
+        : message.postShare
+        ? 'Shared Post'
+        : 'Message');
 
   return (
     <Modal
@@ -170,35 +157,13 @@ export function ChatMessageContextMenu({
             <Text style={styles.previewSender}>
               {isOwn ? 'You' : message.senderName || 'Message'}
             </Text>
-            <Text style={styles.previewText} numberOfLines={1}>
-              {isDeleted
-                ? 'This message was deleted'
-                : message.text ||
-                  (message.mediaType === 'image'
-                    ? '📷 Photo'
-                    : message.mediaType === 'audio'
-                    ? '🎤 Voice memo'
-                    : 'Message')}
+            <Text style={styles.previewText} numberOfLines={2}>
+              {previewSnippetText}
             </Text>
           </View>
 
           {!isDeleted ? (
             <>
-              {/* Copy */}
-              {isTextMsg ? (
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    onClose();
-                    onCopy(message);
-                  }}
-                >
-                  <Text style={styles.actionIcon}>📋</Text>
-                  <Text style={styles.actionLabel}>Copy Text</Text>
-                </TouchableOpacity>
-              ) : null}
-
               {/* Reply */}
               <TouchableOpacity
                 style={styles.actionRow}
@@ -208,100 +173,34 @@ export function ChatMessageContextMenu({
                   onReply(message);
                 }}
               >
-                <Text style={styles.actionIcon}>💬</Text>
+                <View style={styles.actionIconBox}>
+                  <ReplyIcon size={20} color={Colors.userProfilePurple} />
+                </View>
                 <Text style={styles.actionLabel}>Reply</Text>
               </TouchableOpacity>
 
-              {/* Star / Bookmark */}
-              <TouchableOpacity
-                style={styles.actionRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  onClose();
-                  onStar(message);
-                }}
-              >
-                <Text style={styles.actionIcon}>{isStarred ? '⭐' : '☆'}</Text>
-                <Text style={styles.actionLabel}>
-                  {isStarred ? 'Unstar Message' : 'Star Message'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Forward */}
-              <TouchableOpacity
-                style={styles.actionRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  onClose();
-                  onForward(message);
-                }}
-              >
-                <Text style={styles.actionIcon}>↗️</Text>
-                <Text style={styles.actionLabel}>Forward</Text>
-              </TouchableOpacity>
-
-              {/* Info */}
-              <TouchableOpacity
-                style={styles.actionRow}
-                activeOpacity={0.7}
-                onPress={() => {
-                  onClose();
-                  onInfo(message);
-                }}
-              >
-                <Text style={styles.actionIcon}>ℹ️</Text>
-                <Text style={styles.actionLabel}>Message Info</Text>
-              </TouchableOpacity>
-
-              {/* Edit */}
-              {canEdit ? (
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    onClose();
-                    onEdit(message);
-                  }}
-                >
-                  <Text style={styles.actionIcon}>✏️</Text>
-                  <Text style={styles.actionLabel}>Edit</Text>
-                </TouchableOpacity>
+              {/* Delete for Everyone */}
+              {canDeleteForEveryone ? (
+                <>
+                  <View style={styles.divider} />
+                  <TouchableOpacity
+                    style={styles.actionRow}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      onClose();
+                      onDeleteForEveryone(message);
+                    }}
+                  >
+                    <View style={styles.actionIconBox}>
+                      <TrashIcon width={20} height={20} color="#EF4444" />
+                    </View>
+                    <Text style={[styles.actionLabel, styles.actionLabelDestructive]}>
+                      Delete for Everyone
+                    </Text>
+                  </TouchableOpacity>
+                </>
               ) : null}
-
-              <View style={styles.divider} />
             </>
-          ) : null}
-
-          {/* Delete for Me */}
-          <TouchableOpacity
-            style={styles.actionRow}
-            activeOpacity={0.7}
-            onPress={() => {
-              onClose();
-              onDeleteForMe(message);
-            }}
-          >
-            <Text style={styles.actionIcon}>🗑️</Text>
-            <Text style={[styles.actionLabel, styles.actionLabelDestructive]}>
-              Delete for Me
-            </Text>
-          </TouchableOpacity>
-
-          {/* Delete for Everyone */}
-          {canDeleteForEveryone ? (
-            <TouchableOpacity
-              style={styles.actionRow}
-              activeOpacity={0.7}
-              onPress={() => {
-                onClose();
-                onDeleteForEveryone(message);
-              }}
-            >
-              <Text style={styles.actionIcon}>🚨</Text>
-              <Text style={[styles.actionLabel, styles.actionLabelDestructive]}>
-                Delete for Everyone
-              </Text>
-            </TouchableOpacity>
           ) : null}
 
           <TouchableOpacity
@@ -316,4 +215,3 @@ export function ChatMessageContextMenu({
     </Modal>
   );
 }
-

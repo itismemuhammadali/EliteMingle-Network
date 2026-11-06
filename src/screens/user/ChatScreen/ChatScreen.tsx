@@ -82,6 +82,7 @@ import {
 } from '../../../components/admin/icons';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
+import LockIcon from '../../../assets/Icons/profile/accountSettings/lock.svg';
 
 export type ChatMessage = {
   id: string;
@@ -502,8 +503,8 @@ export function ChatScreen() {
     if (!replyingTo) return undefined;
     let snippet = (replyingTo.text || '').trim();
     if (!snippet) {
-      if (replyingTo.mediaType === 'image') snippet = '📷 Photo';
-      else if (replyingTo.mediaType === 'audio') snippet = '🎤 Voice memo';
+      if (replyingTo.mediaType === 'image') snippet = 'Photo';
+      else if (replyingTo.mediaType === 'audio') snippet = 'Voice memo';
       else snippet = 'Message';
     }
 
@@ -1197,8 +1198,9 @@ export function ChatScreen() {
         {/* Announcement Only or Input Bar (Req 5) */}
         {!canSendMessageInGroup ? (
           <View style={styles.announcementBanner}>
+            <LockIcon width={16} height={16} color="#64748B" style={{ marginRight: UtilityMethods.wp(2) }} />
             <Text style={styles.announcementText}>
-              🔒 Only admins can send messages in this group
+              Only admins can send messages in this group
             </Text>
           </View>
         ) : (
@@ -1509,20 +1511,14 @@ export function ChatScreen() {
         </Pressable>
       </Modal>
 
-      {/* Long-Press Context Menu (Req 2) */}
+      {/* Long-Press Context Menu (Reply & Delete for Everyone only) */}
       <ChatMessageContextMenu
-        visible={!!selectedMessage && !editingMessage && !infoMessage && !forwardMessage}
+        visible={!!selectedMessage}
         message={selectedMessage}
         currentUserId={currentUserId}
         isGroupAdmin={isGroupAdmin}
         onClose={() => setSelectedMessage(null)}
-        onCopy={handleCopyMessage}
         onReply={handleReplyMessage}
-        onStar={handleStarMessage}
-        onForward={handleForwardMessage}
-        onInfo={handleInfoMessage}
-        onEdit={handleEditMessage}
-        onDeleteForMe={handleDeleteForMe}
         onDeleteForEveryone={handleDeleteForEveryone}
       />
 
