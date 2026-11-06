@@ -17,8 +17,10 @@ import type { UserStackParamList } from '../../../navigation/User/types';
 import {
   subscribeToConversations,
   subscribeToAllUsers,
+  markConversationAsRead,
   type RegisteredUser,
 } from '../../../services/chatService';
+import { markChatNotificationsAsRead } from '../../../services/notificationService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 
@@ -63,7 +65,17 @@ export function UserMessagesScreen() {
 
   const openChat = useCallback(
     (item: UserMessageListItem) => {
-      if (item.variant === 'group') {
+      const isGroup = item.variant === 'group';
+      const itemPeerId = !isGroup ? item.peerId : undefined;
+      if (currentUserId) {
+        markConversationAsRead(item.id, currentUserId);
+        markChatNotificationsAsRead(currentUserId, {
+          conversationId: item.id,
+          peerId: itemPeerId || item.id,
+          groupId: isGroup ? item.id : undefined,
+        });
+      }
+      if (isGroup) {
         navigation.navigate('Chat', {
           conversationId: item.id,
           peerId: item.id,
@@ -83,11 +95,16 @@ export function UserMessagesScreen() {
         });
       }
     },
-    [navigation],
+    [navigation, currentUserId],
   );
 
   const openChatWithUser = useCallback(
     (user: RegisteredUser) => {
+      if (currentUserId) {
+        markChatNotificationsAsRead(currentUserId, {
+          peerId: user.id,
+        });
+      }
       navigation.navigate('Chat', {
         peerId: user.id,
         peerName: user.name,
@@ -96,7 +113,7 @@ export function UserMessagesScreen() {
         isOnlineStatus: true,
       });
     },
-    [navigation],
+    [navigation, currentUserId],
   );
 
   // 4. Enriched threads and filtered lists computation

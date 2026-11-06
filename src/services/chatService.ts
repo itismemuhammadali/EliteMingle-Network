@@ -3,7 +3,7 @@ import storage from '@react-native-firebase/storage';
 import { Platform } from 'react-native';
 import type { UserMessageListItem } from '../constants/userMessagesData';
 import type { ChatMessage } from '../screens/user/ChatScreen/ChatScreen';
-import { createNotification } from './notificationService';
+import { createNotification, markChatNotificationsAsRead } from './notificationService';
 import { setCachedAudioUri } from './audioCacheService';
 
 export interface ParticipantProfile {
@@ -394,6 +394,8 @@ export const markConversationAsRead = async (
     await convRef.update({
       [`unreadCount.${userId}`]: 0,
     });
+    // Also mark notifications for this conversation as read
+    markChatNotificationsAsRead(userId, { conversationId });
   } catch (err) {
     // Ignore error if doc does not exist yet
   }

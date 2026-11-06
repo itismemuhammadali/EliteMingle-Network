@@ -42,6 +42,10 @@ import {
   subscribeToMessages,
   markConversationAsRead,
 } from '../../../services/chatService';
+import {
+  setActiveChat,
+  markChatNotificationsAsRead,
+} from '../../../services/notificationService';
 import { leaveGroup } from '../../../services/groupService';
 import {
   startAudioRecording,
@@ -224,8 +228,18 @@ export function ChatScreen() {
 
       if (convId && isMounted && currentUserId) {
         markConversationAsRead(convId, currentUserId);
+        markChatNotificationsAsRead(currentUserId, {
+          conversationId: convId,
+          peerId,
+          groupId: isGroupChat ? peerId : undefined,
+        });
         unsubscribe = subscribeToMessages(convId, currentUserId, realTimeMsgs => {
           setMessages(realTimeMsgs);
+          markChatNotificationsAsRead(currentUserId, {
+            conversationId: convId,
+            peerId,
+            groupId: isGroupChat ? peerId : undefined,
+          });
         });
       }
     }
@@ -237,8 +251,67 @@ export function ChatScreen() {
       if (unsubscribe) {
         unsubscribe();
       }
+      if (currentUserId) {
+        setActiveChat(currentUserId, null);
+      }
     };
-  }, [initialConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar]);
+  }, [initialConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar, isGroupChat]);
+
+  // Set active chat and automatically mark unread notifications for this chat as read
+  useEffect(() => {
+    if (!currentUserId) return;
+    const targetConvId = activeConvId || initialConvId;
+    const targetPeerId = peerId;
+    const targetGroupId = isGroupChat ? peerId : undefined;
+
+    // Set user active chat presence
+    setActiveChat(currentUserId, {
+      conversationId: targetConvId,
+      peerId: targetPeerId,
+      groupId: targetGroupId,
+    });
+
+    // Mark existing notifications for this chat as read immediately
+    markChatNotificationsAsRead(currentUserId, {
+      conversationId: targetConvId,
+      peerId: targetPeerId,
+      groupId: targetGroupId,
+    });
+
+    // Real-time listener: if an unread notification arrives for this chat, mark it read immediately
+    const unsub = firestore()
+      .collection('notifications')
+      .where('recipientId', '==', currentUserId)
+      .where('isRead', '==', false)
+      .onSnapshot(snap => {
+        if (!snap || snap.empty) return;
+        const batch = firestore().batch();
+        let matches = 0;
+        snap.docs.forEach(doc => {
+          const d = doc.data();
+          if (d.type !== 'message') return;
+
+          const matchConv = targetConvId && d.conversationId === targetConvId;
+          const matchGroup = targetGroupId && d.groupId === targetGroupId;
+          const matchPeer =
+            targetPeerId &&
+            (d.actorId === targetPeerId || (d.conversationId && d.conversationId.includes(targetPeerId)));
+
+          if (matchConv || matchGroup || matchPeer) {
+            batch.update(doc.ref, { isRead: true });
+            matches++;
+          }
+        });
+        if (matches > 0) {
+          batch.commit().catch(err => console.warn('Auto mark read commit failed:', err));
+        }
+      });
+
+    return () => {
+      unsub();
+      setActiveChat(currentUserId, null);
+    };
+  }, [currentUserId, activeConvId, initialConvId, peerId, isGroupChat]);
 
   const handleBack = useCallback(() => {
     navigation.goBack();

@@ -53,6 +53,95 @@ function buildTitle(
   }
 }
 
+export interface ActiveChatInfo {
+  conversationId?: string;
+  peerId?: string;
+  groupId?: string;
+}
+
+/** Set the active chat currently being viewed by the user. */
+export const setActiveChat = async (
+  userId: string,
+  info: ActiveChatInfo | null,
+): Promise<void> => {
+  if (!userId) return;
+  try {
+    if (!info) {
+      await firestore().collection('users').doc(userId).set(
+        {
+          activeChat: null,
+          activeChatIds: [],
+        },
+        { merge: true },
+      );
+      return;
+    }
+    const ids = [info.conversationId, info.peerId, info.groupId].filter(
+      (id): id is string => Boolean(id && typeof id === 'string' && id.trim().length > 0),
+    );
+    await firestore().collection('users').doc(userId).set(
+      {
+        activeChat: info.conversationId || info.peerId || info.groupId || null,
+        activeChatIds: ids,
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    // Non-blocking
+  }
+};
+
+/**
+ * Mark all unread message notifications for a given conversation, peer, or group as read.
+ */
+export const markChatNotificationsAsRead = async (
+  recipientId: string,
+  options: {
+    conversationId?: string;
+    peerId?: string;
+    groupId?: string;
+  },
+): Promise<void> => {
+  if (!recipientId) return;
+  const { conversationId, peerId, groupId } = options;
+  if (!conversationId && !peerId && !groupId) return;
+
+  try {
+    const notifsRef = firestore().collection('notifications');
+    const snapshot = await notifsRef
+      .where('recipientId', '==', recipientId)
+      .where('isRead', '==', false)
+      .get();
+
+    if (!snapshot || snapshot.empty) return;
+
+    const batch = firestore().batch();
+    let count = 0;
+
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.type !== 'message') return;
+
+      const matchesConv = conversationId && data.conversationId === conversationId;
+      const matchesGroup = groupId && data.groupId === groupId;
+      const matchesPeer =
+        peerId &&
+        (data.actorId === peerId || (data.conversationId && data.conversationId.includes(peerId)));
+
+      if (matchesConv || matchesGroup || matchesPeer) {
+        batch.update(doc.ref, { isRead: true });
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('markChatNotificationsAsRead failed:', err);
+  }
+};
+
 /**
  * Create a notification for `recipientId` caused by `actorId`. Resolves the
  * actor's display name from the users collection so callers stay simple.
@@ -80,19 +169,35 @@ export const createNotification = async (
       .collection('users')
       .doc(recipientId)
       .get();
-    const settings =
-      (docExists(recipientSnap) ? recipientSnap.data()?.notificationSettings : null) ||
-      {};
+    const recipientData = docExists(recipientSnap) ? recipientSnap.data() : null;
+    const settings = recipientData?.notificationSettings || {};
     const typeKey: Record<string, string> = {
       like: 'likes',
       comment: 'comments',
       friend_request: 'friendRequests',
       friend_accept: 'friendRequests',
       message: 'messages',
+      group_invite: 'groupInvites',
     };
     if (settings.push === false) return; // master switch off
     const key = typeKey[type];
     if (key && settings[key] === false) return; // this type is muted
+
+    // Check if recipient is already actively viewing this chat right now
+    const activeChatIds: string[] = Array.isArray(recipientData?.activeChatIds)
+      ? recipientData.activeChatIds
+      : recipientData?.activeChat
+      ? [recipientData.activeChat]
+      : [];
+
+    const isRecipientViewingChat = Boolean(
+      type === 'message' &&
+        (
+          (conversationId && activeChatIds.includes(conversationId)) ||
+          (groupId && activeChatIds.includes(groupId)) ||
+          (actorId && activeChatIds.includes(actorId))
+        )
+    );
 
     const actorSnap = await firestore().collection('users').doc(actorId).get();
     const actor = docExists(actorSnap) ? actorSnap.data() : {};
@@ -109,7 +214,7 @@ export const createNotification = async (
       conversationId,
       groupId,
       groupName: groupName || '',
-      isRead: false,
+      isRead: isRecipientViewingChat ? true : false,
       createdAt: firestore.FieldValue.serverTimestamp(),
     });
   } catch (err) {
