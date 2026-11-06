@@ -221,7 +221,8 @@ export function UserMessagesScreen() {
                     >
                       <ProfileAvatar
                         uri={user.avatarUri}
-                        size={UtilityMethods.wp(12.5)}
+                        size={UtilityMethods.wp(12)}
+                        style={styles.userAvatar}
                       />
                       <View style={styles.userInfo}>
                         <Text style={styles.userName}>{user.name}</Text>
@@ -270,20 +271,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    padding: UtilityMethods.wp(3.5),
+    paddingVertical: UtilityMethods.hp(1.5),
+    paddingHorizontal: UtilityMethods.wp(3.5),
     borderRadius: UtilityMethods.wp(3),
     marginBottom: UtilityMethods.hp(1),
     borderWidth: 1,
     borderColor: Colors.borderGrey,
   },
   userAvatar: {
-    width: UtilityMethods.wp(11),
-    height: UtilityMethods.wp(11),
-    borderRadius: UtilityMethods.wp(5.5),
-    marginRight: UtilityMethods.wp(3),
+    marginRight: UtilityMethods.wp(4.5),
   },
   userInfo: {
     flex: 1,
+    minWidth: 0,
+    marginRight: UtilityMethods.wp(2),
   },
   userName: {
     fontSize: FontSize.VALUE(15),
