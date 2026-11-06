@@ -32,6 +32,7 @@ import { subscribeToFriends, sendFriendRequest, removeFriend } from '../../../se
 import { subscribeToUserGroups } from '../../../services/groupService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
+import { EmailIconSmall, PhoneIcon } from '../../../components/admin/icons';
 
 const H_PAD = UtilityMethods.wp(5);
 
@@ -451,6 +452,7 @@ export function OtherUserProfileScreen() {
       contactText: {
         fontSize: FontSize.VALUE(13),
         color: Colors.textDark,
+        marginLeft: UtilityMethods.wp(1.5),
       },
       mutual: {
         fontSize: FontSize.VALUE(13),
@@ -563,14 +565,16 @@ export function OtherUserProfileScreen() {
             <View style={styles.contactDetails}>
               {profileData?.privacySettings?.showEmail && profileData?.email ? (
                 <View style={styles.contactRow}>
-                  <Text style={styles.contactText}>✉️ {profileData.email}</Text>
+                  <EmailIconSmall size={UtilityMethods.wp(4.2)} color={Colors.userProfilePurple} />
+                  <Text style={styles.contactText}>{profileData.email}</Text>
                 </View>
               ) : null}
               {profileData?.privacySettings?.showPhone &&
               (profileData?.phone || profileData?.phoneNumber) ? (
                 <View style={styles.contactRow}>
+                  <PhoneIcon size={UtilityMethods.wp(4.2)} color={Colors.userProfilePurple} />
                   <Text style={styles.contactText}>
-                    📞 {profileData.phone || profileData.phoneNumber}
+                    {profileData.phone || profileData.phoneNumber}
                   </Text>
                 </View>
               ) : null}

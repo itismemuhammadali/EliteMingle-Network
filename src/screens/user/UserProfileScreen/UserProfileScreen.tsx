@@ -36,7 +36,7 @@ import EditIcon from '../../../assets/Icons/profile/pencil.svg';
 import SettingIcon from '../../../assets/Icons/setting.svg';
 import MicIcon from '../../../assets/Icons/profile/microphone.svg';
 import SpeakerIcon from '../../../assets/Icons/profile/speaker.svg';
-import EmailIcon from '../../../assets/Icons/EmailIcon.svg';
+import { EmailIconSmall, PhoneIcon } from '../../../components/admin/icons';
 
 const H_PAD = UtilityMethods.wp(5);
 
@@ -331,7 +331,7 @@ export function UserProfileScreen() {
             {(profile.privacySettings?.showEmail ?? liveUserDoc?.privacySettings?.showEmail) &&
             (liveUserDoc?.email || liveUserDoc?.emailAddress || profile.email || auth().currentUser?.email) ? (
               <View style={styles.contactRow}>
-                <EmailIcon width={UtilityMethods.wp(4)} height={UtilityMethods.wp(4)} fill={Colors.userProfilePurple} />
+                <EmailIconSmall size={UtilityMethods.wp(4.2)} color={Colors.userProfilePurple} />
                 <Text style={styles.contactText}>
                   {liveUserDoc?.email || liveUserDoc?.emailAddress || profile.email || auth().currentUser?.email}
                 </Text>
@@ -340,7 +340,7 @@ export function UserProfileScreen() {
             {(profile.privacySettings?.showPhone ?? liveUserDoc?.privacySettings?.showPhone) &&
             (liveUserDoc?.phone || liveUserDoc?.phoneNumber || profile.phone || (profile as any)?.phoneNumber) ? (
               <View style={styles.contactRow}>
-                <Text style={{ fontSize: FontSize.VALUE(13) }}>📞</Text>
+                <PhoneIcon size={UtilityMethods.wp(4.2)} color={Colors.userProfilePurple} />
                 <Text style={styles.contactText}>
                   {liveUserDoc?.phone || liveUserDoc?.phoneNumber || profile.phone || (profile as any)?.phoneNumber}
                 </Text>
