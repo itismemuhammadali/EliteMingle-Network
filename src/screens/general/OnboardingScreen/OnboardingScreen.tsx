@@ -103,6 +103,7 @@ export function OnboardingScreen() {
           source={slide.image}
           style={styles.heroImage}
           resizeMode="cover"
+          resizeMethod="resize"
           accessibilityIgnoresInvertColors
         />
       </View>

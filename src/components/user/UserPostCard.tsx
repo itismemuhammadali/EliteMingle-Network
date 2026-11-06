@@ -352,6 +352,8 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
               <Image
                 source={avatarSource}
                 style={styles.avatarImage}
+                resizeMethod="resize"
+                resizeMode="cover"
               />
             ) : (
               <View style={[styles.avatar, { backgroundColor: post.avatarColor || Colors.userProfilePurple, alignItems: 'center', justifyContent: 'center' }]}>
@@ -418,6 +420,7 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
           <Image
             source={imageSource}
             style={styles.postImage}
+            resizeMethod="resize"
             resizeMode="cover"
             onError={(e) => {
               console.log('[UserPostCard Image Error]:', mediaUrl, e.nativeEvent);

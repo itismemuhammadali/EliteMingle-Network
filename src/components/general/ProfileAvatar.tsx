@@ -61,6 +61,7 @@ export function ProfileAvatar({
             imageStyle,
           ]}
           resizeMode="cover"
+          resizeMethod="resize"
         />
       ) : (
         <UserTabProfileIcon size={Math.round(size * 0.55)} color={iconColor} />

@@ -70,7 +70,7 @@ export function SplashScreenView({ onAnimationEnd }: SplashScreenViewProps) {
 
       {/* Decorative background overlay */}
       <Image
-        source={require('../../assets/images/background.png')}
+        source={require('../../assets/images/background.webp')}
         style={styles.backgroundImage}
         resizeMode="cover"
       />

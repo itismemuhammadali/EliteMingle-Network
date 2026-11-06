@@ -49,7 +49,7 @@ export function TwoFactorAuthScreen() {
   return (
     <MainLayout
       showBackGroundImage={true}
-      imageSource={require('../../../assets/images/background.png')}
+      imageSource={require('../../../assets/images/background.webp')}
       barStyle="dark-content"
       contentContainerStyle={styles.contentContainer}
     >
