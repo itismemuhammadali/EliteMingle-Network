@@ -16,6 +16,7 @@ import {
   Image,
   Clipboard,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -33,12 +34,23 @@ import {
   MessageBubble,
   ChatInput,
   ChatEmojiPicker,
+  QuotedMessagePreview,
+  ChatMessageContextMenu,
+  MessageInfoModal,
+  ForwardMessageModal,
+  GroupMentionsOverlay,
+  type MentionParticipant,
 } from '../../../components/user';
+import { formatMessageSnippet, getParticipantColor } from '../../../utils/chatHelpers';
 import { Colors } from '../../../constants/colors';
 import {
   getOrCreateDirectConversation,
   getOrCreateGroupConversation,
   sendMessage as sendChatMessage,
+  deleteMessageForEveryone,
+  deleteMessageForMe,
+  editChatMessage,
+  toggleStarMessage,
   uploadChatImage,
   uploadChatAudio,
   subscribeToMessages,
@@ -94,6 +106,19 @@ export type ChatMessage = {
     senderName?: string;
     mediaType?: 'image' | 'audio';
   };
+  parent_message_id?: string | null;
+  quoted_sender_name?: string | null;
+  quoted_snippet?: string | null;
+  quoted_media_type?: string | null;
+  is_deleted?: boolean;
+  deleted_for?: string[];
+  is_edited?: boolean;
+  starred_by?: string[];
+  mentions?: string[];
+  is_system?: boolean;
+  system_event?: 'user_joined' | 'user_left' | 'admin_promoted' | 'group_created' | string;
+  createdAtMs?: number;
+  readBy?: string[];
 };
 
 const REPORT_REASONS = [
@@ -168,10 +193,82 @@ export function ChatScreen() {
   } | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  // Message action sheet state (for Reply / Copy)
+  // Message action sheet state (for Reply / Copy / Context Menu)
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
 
+  const flatListRef = useRef<FlatList<ChatMessage>>(null);
+
+  // Modals for Context Menu Actions (Req 2)
+  const [infoMessage, setInfoMessage] = useState<ChatMessage | null>(null);
+  const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [editText, setEditText] = useState('');
+
+  // Mentions autocomplete state (@username) (Req 4)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [draftMentions, setDraftMentions] = useState<string[]>([]);
+  const [groupParticipants, setGroupParticipants] = useState<MentionParticipant[]>([]);
+
+  // Group Admin & Roles State (Req 5)
+  const [groupData, setGroupData] = useState<{
+    ownerId?: string;
+    adminIds?: string[];
+    members?: string[];
+    announcement_only?: boolean;
+  } | null>(null);
+
   const currentUserId = auth().currentUser?.uid || '';
+
+  // Role checks (Req 5)
+  const isGroupAdmin = useMemo(() => {
+    if (!isGroupChat) return false;
+    if (!groupData) return false;
+    return (
+      groupData.ownerId === currentUserId ||
+      (Array.isArray(groupData.adminIds) && groupData.adminIds.includes(currentUserId))
+    );
+  }, [isGroupChat, groupData, currentUserId]);
+
+  const isAnnouncementOnly = Boolean(groupData?.announcement_only);
+  const canSendMessageInGroup = !isGroupChat || !isAnnouncementOnly || isGroupAdmin;
+
+  // Fetch group participant names for mentions (Req 4)
+  useEffect(() => {
+    if (!isGroupChat) {
+      setGroupParticipants([]);
+      return;
+    }
+    const memberIds = groupData?.members || [];
+    if (memberIds.length === 0) return;
+
+    const queryIds = memberIds.slice(0, 30);
+    firestore()
+      .collection('users')
+      .where(firestore.FieldPath.documentId(), 'in', queryIds)
+      .get()
+      .then(snap => {
+        const parts: MentionParticipant[] = [];
+        snap.docs.forEach(doc => {
+          if (doc.id === currentUserId) return;
+          const d = doc.data();
+          const name = d.fullName || d.displayName || d.name || d.email?.split('@')[0] || 'User';
+          const role =
+            groupData?.ownerId === doc.id
+              ? 'Owner'
+              : groupData?.adminIds?.includes(doc.id)
+              ? 'Admin'
+              : 'Member';
+          parts.push({
+            id: doc.id,
+            name,
+            avatarUri: d.profilePicture || d.avatarUri || d.avatarUrl,
+            role,
+          });
+        });
+        setGroupParticipants(parts);
+      })
+      .catch(err => console.warn('Fetch group participants for mentions error:', err));
+  }, [isGroupChat, groupData?.members, groupData?.ownerId, groupData?.adminIds, currentUserId]);
 
   // Dynamically resolve peer / group metadata from Firestore
   useEffect(() => {
@@ -187,6 +284,16 @@ export function ChatScreen() {
             if (data?.name) setCurrentPeerName(data.name);
             const avatar = data?.avatarUri || data?.coverUri;
             if (avatar) setCurrentPeerAvatar(avatar);
+            setGroupData({
+              ownerId: data?.ownerId,
+              adminIds: Array.isArray(data?.adminIds)
+                ? data.adminIds
+                : data?.ownerId
+                ? [data.ownerId]
+                : [],
+              members: Array.isArray(data?.members) ? data.members : [],
+              announcement_only: !!(data?.announcement_only ?? data?.announcementOnly),
+            });
           }
         });
       return () => unsub();
@@ -394,6 +501,38 @@ export function ChatScreen() {
     };
   }, [replyingTo, currentPeerName]);
 
+  const handleDraftChange = useCallback(
+    (text: string) => {
+      setDraft(text);
+      if (showEmojiPicker) setShowEmojiPicker(false);
+
+      if (isGroupChat) {
+        // Look for trailing @word pattern to trigger autocomplete overlay
+        const match = text.match(/@([a-zA-Z0-9_]*)$/);
+        if (match) {
+          setMentionQuery(match[1] || '');
+        } else {
+          setMentionQuery(null);
+        }
+      }
+    },
+    [isGroupChat, showEmojiPicker],
+  );
+
+  const handleSelectMention = useCallback(
+    (participant: MentionParticipant) => {
+      if (mentionQuery === null) return;
+      const prefix = draft.slice(0, draft.length - (mentionQuery.length + 1));
+      const newDraft = `${prefix}@${participant.name} `;
+      setDraft(newDraft);
+      setDraftMentions(prev =>
+        prev.includes(participant.id) ? prev : [...prev, participant.id],
+      );
+      setMentionQuery(null);
+    },
+    [draft, mentionQuery],
+  );
+
   const handleSend = useCallback(async () => {
     const t = draft.trim();
     if (!t) return;
@@ -401,11 +540,19 @@ export function ChatScreen() {
       Alert.alert('Sign In Required', 'Please sign in to send messages.');
       return;
     }
+    if (!canSendMessageInGroup) {
+      Alert.alert('Notice', 'Only group admins can send messages in this group.');
+      return;
+    }
 
     const replyData = buildReplyPayload();
     const prevReplyingTo = replyingTo;
+    const mentionsToSend = [...draftMentions];
+
     setDraft('');
     setReplyingTo(null);
+    setMentionQuery(null);
+    setDraftMentions([]);
 
     let convId = activeConvId;
     if (!convId && currentUserId) {
@@ -427,10 +574,23 @@ export function ChatScreen() {
 
     if (convId) {
       try {
+        const replySender = prevReplyingTo
+          ? prevReplyingTo.isOutgoing
+            ? 'You'
+            : (prevReplyingTo.senderName || currentPeerName)
+          : null;
+        const replySnippet = prevReplyingTo ? formatMessageSnippet(prevReplyingTo) : null;
+        const replyMediaType = prevReplyingTo?.mediaType || null;
+
         await sendChatMessage({
           conversationId: convId,
           senderId: currentUserId,
           text: t,
+          parent_message_id: prevReplyingTo ? prevReplyingTo.id : null,
+          quoted_sender_name: replySender,
+          quoted_snippet: replySnippet,
+          quoted_media_type: replyMediaType,
+          mentions: mentionsToSend.length > 0 ? mentionsToSend : undefined,
           replyTo: replyData,
         });
       } catch (err: any) {
@@ -445,6 +605,8 @@ export function ChatScreen() {
         text: t,
         time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
         isOutgoing: true,
+        parent_message_id: prevReplyingTo ? prevReplyingTo.id : null,
+        quoted_snippet: prevReplyingTo ? formatMessageSnippet(prevReplyingTo) : null,
         replyTo: replyData,
       };
       setMessages(prev => [...prev, msg]);
@@ -456,10 +618,12 @@ export function ChatScreen() {
     peerId,
     normalizedGroupId,
     isGroupChat,
+    canSendMessageInGroup,
     currentPeerName,
     currentPeerAvatar,
     buildReplyPayload,
     replyingTo,
+    draftMentions,
   ]);
 
   const handleAttach = useCallback(() => {
@@ -644,24 +808,191 @@ export function ChatScreen() {
 
   const listData = useMemo(() => [...messages].reverse(), [messages]);
 
+  const handlePressQuoted = useCallback(
+    (parentId?: string | null) => {
+      if (!parentId) return;
+      const targetIndex = listData.findIndex(m => m.id === parentId);
+      if (targetIndex >= 0 && flatListRef.current) {
+        try {
+          flatListRef.current.scrollToIndex({
+            index: targetIndex,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        } catch (err) {
+          flatListRef.current.scrollToOffset({
+            offset: targetIndex * 70,
+            animated: true,
+          });
+        }
+      }
+    },
+    [listData],
+  );
+
+  const handleCopyMessage = useCallback((msg: ChatMessage) => {
+    if (msg.text) {
+      Clipboard.setString(msg.text);
+      Alert.alert('Copied', 'Message text copied to clipboard.');
+    }
+  }, []);
+
+  const handleReplyMessage = useCallback((msg: ChatMessage) => {
+    setReplyingTo(msg);
+  }, []);
+
+  const handleStarMessage = useCallback(
+    async (msg: ChatMessage) => {
+      if (!activeConvId || !currentUserId) return;
+      const isCurrentlyStarred = Boolean(
+        msg.starred_by && msg.starred_by.includes(currentUserId),
+      );
+      try {
+        await toggleStarMessage(activeConvId, msg.id, currentUserId, isCurrentlyStarred);
+      } catch (err: any) {
+        console.warn('Star toggle error:', err);
+      }
+    },
+    [activeConvId, currentUserId],
+  );
+
+  const handleForwardMessage = useCallback((msg: ChatMessage) => {
+    setForwardMessage(msg);
+  }, []);
+
+  const handleInfoMessage = useCallback((msg: ChatMessage) => {
+    setInfoMessage(msg);
+  }, []);
+
+  const handleEditMessage = useCallback((msg: ChatMessage) => {
+    setEditText(msg.text || '');
+    setEditingMessage(msg);
+  }, []);
+
+  const handleDeleteForMe = useCallback(
+    (msg: ChatMessage) => {
+      Alert.alert(
+        'Delete Message',
+        'Delete this message for yourself? It will be removed from your view.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete for Me',
+            style: 'destructive',
+            onPress: async () => {
+              if (!activeConvId || !currentUserId) return;
+              try {
+                await deleteMessageForMe(activeConvId, msg.id, currentUserId);
+                setSelectedMessage(null);
+              } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Could not delete message.');
+              }
+            },
+          },
+        ],
+      );
+    },
+    [activeConvId, currentUserId],
+  );
+
+  const handleDeleteForEveryone = useCallback(
+    (msg: ChatMessage) => {
+      Alert.alert(
+        'Delete for Everyone?',
+        'This message will be deleted for everyone in this chat.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete for Everyone',
+            style: 'destructive',
+            onPress: async () => {
+              if (!activeConvId) return;
+              try {
+                await deleteMessageForEveryone(activeConvId, msg.id);
+                setSelectedMessage(null);
+              } catch (err: any) {
+                Alert.alert('Error', err?.message || 'Could not delete message.');
+              }
+            },
+          },
+        ],
+      );
+    },
+    [activeConvId],
+  );
+
+  const handleForwardTo = useCallback(
+    async (targetConvId: string, targetName: string) => {
+      if (!forwardMessage || !currentUserId) return;
+      try {
+        await sendChatMessage({
+          conversationId: targetConvId,
+          senderId: currentUserId,
+          text: forwardMessage.text || '',
+          mediaUrl: forwardMessage.mediaUrl,
+          mediaType: forwardMessage.mediaType,
+          postShare: forwardMessage.postShare,
+        });
+        setForwardMessage(null);
+        Alert.alert('Success', `Message forwarded to ${targetName}.`);
+      } catch (err: any) {
+        console.warn('Forward failed:', err);
+        Alert.alert('Forward Failed', err?.message || 'Could not forward message.');
+      }
+    },
+    [forwardMessage, currentUserId],
+  );
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!activeConvId || !editingMessage) return;
+    const newText = editText.trim();
+    if (!newText) return;
+    try {
+      await editChatMessage(activeConvId, editingMessage.id, newText);
+      setEditingMessage(null);
+    } catch (err: any) {
+      Alert.alert('Edit Error', err?.message || 'Could not update message.');
+    }
+  }, [activeConvId, editingMessage, editText]);
+
   const renderItem = useCallback(
-    ({ item }: { item: ChatMessage }) => (
-      <MessageBubble
-        text={item.text}
-        time={item.time}
-        isOutgoing={item.isOutgoing}
-        mediaUrl={item.mediaUrl}
-        mediaType={item.mediaType}
-        senderName={item.senderName}
-        showSenderName={isGroupChat}
-        postShare={item.postShare}
-        replyTo={item.replyTo}
-        onPressImage={url => setFullScreenImageUrl(url)}
-        onPressPost={handlePressPost}
-        onLongPress={() => handleLongPressMessage(item)}
-      />
-    ),
-    [isGroupChat, handleLongPressMessage, handlePressPost],
+    ({ item }: { item: ChatMessage }) => {
+      const isStarred = Boolean(
+        item.starred_by && item.starred_by.includes(currentUserId),
+      );
+
+      return (
+        <MessageBubble
+          id={item.id}
+          text={item.text}
+          time={item.time}
+          isOutgoing={item.isOutgoing}
+          senderId={item.senderId}
+          mediaUrl={item.mediaUrl}
+          mediaType={item.mediaType}
+          senderName={item.senderName}
+          showSenderName={isGroupChat}
+          postShare={item.postShare}
+          replyTo={item.replyTo}
+          parent_message_id={item.parent_message_id}
+          quoted_sender_name={item.quoted_sender_name}
+          quoted_snippet={item.quoted_snippet}
+          quoted_media_type={item.quoted_media_type as any}
+          is_deleted={item.is_deleted}
+          is_edited={item.is_edited}
+          is_system={item.is_system}
+          system_event={item.system_event}
+          isStarred={isStarred}
+          mentions={item.mentions}
+          onPressImage={url => setFullScreenImageUrl(url)}
+          onPressPost={handlePressPost}
+          onLongPress={() => handleLongPressMessage(item)}
+          onSwipeReply={() => setReplyingTo(item)}
+          onPressQuoted={handlePressQuoted}
+        />
+      );
+    },
+    [isGroupChat, currentUserId, handleLongPressMessage, handlePressPost, handlePressQuoted],
   );
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
@@ -807,6 +1138,7 @@ export function ChatScreen() {
       >
         {listData.length > 0 ? (
           <FlatList
+            ref={flatListRef}
             style={styles.flex}
             data={listData}
             inverted
@@ -815,6 +1147,12 @@ export function ChatScreen() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            onScrollToIndexFailed={info => {
+              flatListRef.current?.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true,
+              });
+            }}
           />
         ) : (
           <View style={styles.emptyContainer}>
@@ -824,60 +1162,63 @@ export function ChatScreen() {
           </View>
         )}
 
-        {/* Reply preview banner */}
+        {/* Active Reply Preview Bar Docked Above Input (Req 1) */}
         {replyingTo ? (
-          <View style={styles.replyBannerContainer}>
-            <View style={styles.replyBannerBar} />
-            <View style={styles.replyBannerContent}>
-              <Text style={styles.replyBannerTitle} numberOfLines={1}>
-                Replying to {replyingTo.isOutgoing ? 'yourself' : (replyingTo.senderName || currentPeerName)}
-              </Text>
-              <Text style={styles.replyBannerText} numberOfLines={1}>
-                {replyingTo.mediaType === 'image'
-                  ? '📷 Photo'
-                  : replyingTo.mediaType === 'audio'
-                  ? '🎤 Voice memo'
-                  : replyingTo.text}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setReplyingTo(null)}
-              hitSlop={12}
-              style={styles.replyBannerCloseBtn}
-            >
-              <Text style={styles.replyBannerCloseText}>✕</Text>
-            </TouchableOpacity>
-          </View>
+          <QuotedMessagePreview
+            senderName={
+              replyingTo.isOutgoing
+                ? 'yourself'
+                : (replyingTo.senderName || currentPeerName)
+            }
+            snippet={formatMessageSnippet(replyingTo)}
+            mediaType={replyingTo.mediaType}
+            onCancel={() => setReplyingTo(null)}
+          />
         ) : null}
 
-        <View
-          style={{
-            paddingBottom: keyboardOpen ? 0 : insets.bottom,
-          }}
-        >
-          <ChatInput
-            value={draft}
-            onChangeText={t => {
-              setDraft(t);
-              if (showEmojiPicker) setShowEmojiPicker(false);
+        {/* Announcement Only or Input Bar (Req 5) */}
+        {!canSendMessageInGroup ? (
+          <View style={styles.announcementBanner}>
+            <Text style={styles.announcementText}>
+              🔒 Only admins can send messages in this group
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={{
+              paddingBottom: keyboardOpen ? 0 : insets.bottom,
             }}
-            onSend={handleSend}
-            onAttachPress={handleAttach}
-            onEmojiPress={handleToggleEmoji}
-            onMicPress={handleMicPress}
-            isRecording={isRecording}
-            recordingSeconds={recordSeconds}
-            onCancelRecording={handleCancelAudio}
-            onStopAndSendRecording={handleStopAndSendAudio}
-          />
+          >
+            {/* Group Mentions Autocomplete Overlay (Req 4) */}
+            {mentionQuery !== null && isGroupChat && groupParticipants.length > 0 ? (
+              <GroupMentionsOverlay
+                participants={groupParticipants}
+                query={mentionQuery}
+                onSelect={handleSelectMention}
+              />
+            ) : null}
 
-          {showEmojiPicker && (
-            <ChatEmojiPicker
-              onSelectEmoji={handleSelectEmoji}
-              onBackspace={handleBackspaceEmoji}
+            <ChatInput
+              value={draft}
+              onChangeText={handleDraftChange}
+              onSend={handleSend}
+              onAttachPress={handleAttach}
+              onEmojiPress={handleToggleEmoji}
+              onMicPress={handleMicPress}
+              isRecording={isRecording}
+              recordingSeconds={recordSeconds}
+              onCancelRecording={handleCancelAudio}
+              onStopAndSendRecording={handleStopAndSendAudio}
             />
-          )}
-        </View>
+
+            {showEmojiPicker && (
+              <ChatEmojiPicker
+                onSelectEmoji={handleSelectEmoji}
+                onBackspace={handleBackspaceEmoji}
+              />
+            )}
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* Redesigned Group / Direct Options Modal */}
@@ -1150,64 +1491,70 @@ export function ChatScreen() {
         </Pressable>
       </Modal>
 
-      {/* Message Context Action Sheet (Reply / Copy) */}
+      {/* Long-Press Context Menu (Req 2) */}
+      <ChatMessageContextMenu
+        visible={!!selectedMessage && !editingMessage && !infoMessage && !forwardMessage}
+        message={selectedMessage}
+        currentUserId={currentUserId}
+        isGroupAdmin={isGroupAdmin}
+        onClose={() => setSelectedMessage(null)}
+        onCopy={handleCopyMessage}
+        onReply={handleReplyMessage}
+        onStar={handleStarMessage}
+        onForward={handleForwardMessage}
+        onInfo={handleInfoMessage}
+        onEdit={handleEditMessage}
+        onDeleteForMe={handleDeleteForMe}
+        onDeleteForEveryone={handleDeleteForEveryone}
+      />
+
+      {/* Message Info / Delivery & Read Status Modal (Req 2) */}
+      <MessageInfoModal
+        visible={!!infoMessage}
+        message={infoMessage}
+        onClose={() => setInfoMessage(null)}
+      />
+
+      {/* Forward Message Modal (Req 2) */}
+      <ForwardMessageModal
+        visible={!!forwardMessage}
+        message={forwardMessage}
+        onClose={() => setForwardMessage(null)}
+        onForwardTo={handleForwardTo}
+      />
+
+      {/* Edit Message Modal (Req 2) */}
       <Modal
-        visible={!!selectedMessage}
+        visible={!!editingMessage}
         transparent
         animationType="fade"
-        onRequestClose={() => setSelectedMessage(null)}
+        onRequestClose={() => setEditingMessage(null)}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setSelectedMessage(null)}
-        >
-          <View style={styles.optionsModalCard}>
-            <Text style={styles.optionsModalTitle}>Message Options</Text>
-
-            <TouchableOpacity
-              style={styles.optionRow}
-              activeOpacity={0.7}
-              onPress={() => {
-                if (selectedMessage) {
-                  setReplyingTo(selectedMessage);
-                  setSelectedMessage(null);
-                }
-              }}
-            >
-              <Text style={styles.optionLabel}>💬  Reply</Text>
-            </TouchableOpacity>
-
-            {selectedMessage?.text &&
-            selectedMessage.text !== 'Sent a photo' &&
-            selectedMessage.text !== 'Sent a voice memo' ? (
-              <>
-                <View style={styles.optionDivider} />
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    if (selectedMessage?.text) {
-                      Clipboard.setString(selectedMessage.text);
-                      Alert.alert('Copied', 'Message text copied to clipboard.');
-                    }
-                    setSelectedMessage(null);
-                  }}
-                >
-                  <Text style={styles.optionLabel}>📋  Copy Text</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-
-            <View style={styles.optionDivider} />
-
-            <TouchableOpacity
-              style={styles.optionRow}
-              activeOpacity={0.7}
-              onPress={() => setSelectedMessage(null)}
-            >
-              <Text style={styles.optionCancelLabel}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+        <Pressable style={styles.modalBackdrop} onPress={() => setEditingMessage(null)}>
+          <Pressable style={styles.editModalCard} onPress={e => e.stopPropagation()}>
+            <Text style={styles.editModalTitle}>Edit Message</Text>
+            <TextInput
+              style={styles.editTextInput}
+              value={editText}
+              onChangeText={setEditText}
+              multiline
+              autoFocus
+            />
+            <View style={styles.editModalBtns}>
+              <TouchableOpacity
+                style={styles.editCancelBtn}
+                onPress={() => setEditingMessage(null)}
+              >
+                <Text style={styles.editCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.editSaveBtn}
+                onPress={handleSaveEdit}
+              >
+                <Text style={styles.editSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -1570,5 +1917,80 @@ const styles = StyleSheet.create({
     fontSize: FontSize.VALUE(14.5),
     fontWeight: '600',
     color: '#4B5563',
+  },
+  announcementBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: UtilityMethods.hp(1.6),
+    paddingHorizontal: UtilityMethods.wp(4),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#CBD5E1',
+  },
+  announcementText: {
+    fontSize: FontSize.VALUE(13.5),
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  editModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: Colors.white,
+    borderRadius: UtilityMethods.wp(4),
+    padding: UtilityMethods.wp(4.5),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  editModalTitle: {
+    fontSize: FontSize.VALUE(16),
+    fontWeight: '700',
+    color: Colors.textDark,
+    marginBottom: UtilityMethods.hp(1.2),
+  },
+  editTextInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: UtilityMethods.wp(2.5),
+    borderWidth: 1,
+    borderColor: Colors.borderGrey,
+    paddingHorizontal: UtilityMethods.wp(3),
+    paddingVertical: UtilityMethods.hp(1),
+    fontSize: FontSize.VALUE(14),
+    color: Colors.textDark,
+    minHeight: UtilityMethods.hp(8),
+    maxHeight: UtilityMethods.hp(16),
+    textAlignVertical: 'top',
+    marginBottom: UtilityMethods.hp(1.5),
+  },
+  editModalBtns: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: UtilityMethods.wp(2.5),
+  },
+  editCancelBtn: {
+    paddingVertical: UtilityMethods.hp(0.9),
+    paddingHorizontal: UtilityMethods.wp(3.5),
+    borderRadius: UtilityMethods.wp(2),
+    backgroundColor: '#F1F5F9',
+  },
+  editCancelText: {
+    fontSize: FontSize.VALUE(13.5),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  editSaveBtn: {
+    paddingVertical: UtilityMethods.hp(0.9),
+    paddingHorizontal: UtilityMethods.wp(4),
+    borderRadius: UtilityMethods.wp(2),
+    backgroundColor: Colors.userProfilePurple,
+  },
+  editSaveText: {
+    fontSize: FontSize.VALUE(13.5),
+    fontWeight: '700',
+    color: Colors.white,
   },
 });

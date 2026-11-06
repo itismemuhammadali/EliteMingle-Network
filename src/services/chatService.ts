@@ -2,6 +2,7 @@ import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firest
 import storage from '@react-native-firebase/storage';
 import { Platform } from 'react-native';
 import type { UserMessageListItem } from '../constants/userMessagesData';
+export type { UserMessageListItem };
 import type { ChatMessage } from '../screens/user/ChatScreen/ChatScreen';
 import { createNotification, markChatNotificationsAsRead } from './notificationService';
 import { setCachedAudioUri } from './audioCacheService';
@@ -236,6 +237,13 @@ export const sendMessage = async ({
   mediaType,
   replyTo,
   postShare,
+  parent_message_id,
+  quoted_sender_name,
+  quoted_snippet,
+  quoted_media_type,
+  mentions,
+  is_system,
+  system_event,
 }: {
   conversationId: string;
   senderId: string;
@@ -250,6 +258,13 @@ export const sendMessage = async ({
     mediaType?: 'image' | 'audio';
   };
   postShare?: SharedPostPayload;
+  parent_message_id?: string | null;
+  quoted_sender_name?: string | null;
+  quoted_snippet?: string | null;
+  quoted_media_type?: string | null;
+  mentions?: string[];
+  is_system?: boolean;
+  system_event?: string | null;
 }): Promise<string> => {
   if (!conversationId || !senderId) {
     throw new Error('conversationId and senderId are required.');
@@ -300,6 +315,11 @@ export const sendMessage = async ({
     };
   }
 
+  const effectiveParentId = parent_message_id || cleanedReplyTo?.id || null;
+  const effectiveQuotedName = quoted_sender_name || cleanedReplyTo?.senderName || null;
+  const effectiveQuotedSnippet = quoted_snippet || cleanedReplyTo?.text || null;
+  const effectiveQuotedMediaType = quoted_media_type || cleanedReplyTo?.mediaType || null;
+
   const messageData = {
     id: msgId,
     conversationId,
@@ -309,6 +329,17 @@ export const sendMessage = async ({
     mediaUrl: mediaUrl || null,
     mediaType: mediaType || (mediaUrl ? 'image' : null),
     replyTo: cleanedReplyTo,
+    parent_message_id: effectiveParentId,
+    quoted_sender_name: effectiveQuotedName,
+    quoted_snippet: effectiveQuotedSnippet,
+    quoted_media_type: effectiveQuotedMediaType,
+    mentions: Array.isArray(mentions) ? mentions : [],
+    is_deleted: false,
+    deleted_for: [],
+    is_edited: false,
+    starred_by: [],
+    is_system: !!is_system,
+    system_event: system_event || null,
     postShare: postShare || null,
     createdAt: timestamp,
     readBy: [senderId],
@@ -418,6 +449,116 @@ export const sendMessage = async ({
   });
 
   return msgId;
+};
+
+/**
+ * Delete a message for everyone (clears content and sets is_deleted: true).
+ */
+export const deleteMessageForEveryone = async (
+  conversationId: string,
+  messageId: string,
+): Promise<void> => {
+  if (!conversationId || !messageId) return;
+  const msgRef = firestore()
+    .collection('conversations')
+    .doc(conversationId)
+    .collection('messages')
+    .doc(messageId);
+
+  await msgRef.update({
+    is_deleted: true,
+    text: '',
+    mediaUrl: null,
+    mediaType: null,
+    postShare: null,
+    replyTo: null,
+    quoted_snippet: null,
+    quoted_sender_name: null,
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  });
+};
+
+/**
+ * Delete a message for the current user only (adds userId to deleted_for array).
+ */
+export const deleteMessageForMe = async (
+  conversationId: string,
+  messageId: string,
+  userId: string,
+): Promise<void> => {
+  if (!conversationId || !messageId || !userId) return;
+  const msgRef = firestore()
+    .collection('conversations')
+    .doc(conversationId)
+    .collection('messages')
+    .doc(messageId);
+
+  await msgRef.update({
+    deleted_for: firestore.FieldValue.arrayUnion(userId),
+  });
+};
+
+/**
+ * Edit a text message.
+ */
+export const editChatMessage = async (
+  conversationId: string,
+  messageId: string,
+  newText: string,
+): Promise<void> => {
+  if (!conversationId || !messageId || !newText.trim()) return;
+  const msgRef = firestore()
+    .collection('conversations')
+    .doc(conversationId)
+    .collection('messages')
+    .doc(messageId);
+
+  await msgRef.update({
+    text: newText.trim(),
+    is_edited: true,
+    editedAt: firestore.FieldValue.serverTimestamp(),
+  });
+};
+
+/**
+ * Star or unstar a message.
+ */
+export const toggleStarMessage = async (
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  currentlyStarred: boolean,
+): Promise<void> => {
+  if (!conversationId || !messageId || !userId) return;
+  const msgRef = firestore()
+    .collection('conversations')
+    .doc(conversationId)
+    .collection('messages')
+    .doc(messageId);
+
+  await msgRef.update({
+    starred_by: currentlyStarred
+      ? firestore.FieldValue.arrayRemove(userId)
+      : firestore.FieldValue.arrayUnion(userId),
+  });
+};
+
+/**
+ * Send a system / event message (e.g. user_joined, admin_promoted, group_created).
+ */
+export const sendSystemMessage = async (
+  conversationId: string,
+  text: string,
+  system_event: string,
+): Promise<string> => {
+  return sendMessage({
+    conversationId,
+    senderId: 'system',
+    senderName: 'System',
+    text: text.trim(),
+    is_system: true,
+    system_event,
+  });
 };
 
 /**
@@ -627,57 +768,85 @@ export const subscribeToMessages = (
           );
         }
 
-        const messagesList: ChatMessage[] = snapshot.docs.map(doc => {
-          const data = doc.data() as any;
-          let timeStr = '';
-          if (data.createdAt) {
-            const date = typeof (data.createdAt as any)?.toDate === 'function'
-              ? (data.createdAt as any).toDate()
-              : new Date();
-            timeStr = date.toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-            });
-          }
+        const messagesList: ChatMessage[] = snapshot.docs
+          .filter(doc => {
+            const data = doc.data() as any;
+            const deletedFor: string[] = Array.isArray(data.deleted_for)
+              ? data.deleted_for
+              : [];
+            return !deletedFor.includes(currentUserId);
+          })
+          .map(doc => {
+            const data = doc.data() as any;
+            let timeStr = '';
+            let createdAtMs = 0;
+            if (data.createdAt) {
+              const date =
+                typeof (data.createdAt as any)?.toDate === 'function'
+                  ? (data.createdAt as any).toDate()
+                  : new Date();
+              createdAtMs = date.getTime();
+              timeStr = date.toLocaleTimeString([], {
+                hour: 'numeric',
+                minute: '2-digit',
+              });
+            }
 
-          const mediaType =
-            data.mediaType ||
-            (data.mediaUrl
-              ? data.mediaUrl.includes('.m4a') ||
-                data.mediaUrl.includes('.mp3') ||
-                data.mediaUrl.includes('.aac') ||
-                data.text === 'Sent a voice memo'
-                ? 'audio'
-                : 'image'
-              : undefined);
+            const mediaType =
+              data.mediaType ||
+              (data.mediaUrl
+                ? data.mediaUrl.includes('.m4a') ||
+                  data.mediaUrl.includes('.mp3') ||
+                  data.mediaUrl.includes('.aac') ||
+                  data.text === 'Sent a voice memo'
+                  ? 'audio'
+                  : 'image'
+                : undefined);
 
-          const senderName =
-            data.senderName ||
-            (data.senderId ? userNameCache[data.senderId] : undefined) ||
-            '';
+            const senderName =
+              data.senderName ||
+              (data.senderId ? userNameCache[data.senderId] : undefined) ||
+              '';
 
-          const postShare = data.postShare || extractPostShareFromText(data.text);
+            const postShare =
+              data.postShare || extractPostShareFromText(data.text);
 
-          return {
-            id: doc.id,
-            senderId: data.senderId,
-            senderName,
-            text: data.text || '',
-            time: timeStr,
-            isOutgoing: data.senderId === currentUserId,
-            mediaUrl: data.mediaUrl || undefined,
-            mediaType,
-            replyTo: data.replyTo
-              ? {
-                  id: data.replyTo.id || '',
-                  text: data.replyTo.text || '',
-                  senderName: data.replyTo.senderName || 'Member',
-                  mediaType: data.replyTo.mediaType || undefined,
-                }
-              : undefined,
-            postShare: postShare || undefined,
-          };
-        });
+            return {
+              id: doc.id,
+              senderId: data.senderId,
+              senderName,
+              text: data.text || '',
+              time: timeStr,
+              isOutgoing: data.senderId === currentUserId,
+              mediaUrl: data.mediaUrl || undefined,
+              mediaType,
+              replyTo: data.replyTo
+                ? {
+                    id: data.replyTo.id || '',
+                    text: data.replyTo.text || '',
+                    senderName: data.replyTo.senderName || 'Member',
+                    mediaType: data.replyTo.mediaType || undefined,
+                  }
+                : undefined,
+              parent_message_id:
+                data.parent_message_id || data.replyTo?.id || undefined,
+              quoted_sender_name:
+                data.quoted_sender_name || data.replyTo?.senderName || undefined,
+              quoted_snippet:
+                data.quoted_snippet || data.replyTo?.text || undefined,
+              quoted_media_type:
+                data.quoted_media_type || data.replyTo?.mediaType || undefined,
+              is_deleted: !!data.is_deleted,
+              is_edited: !!data.is_edited,
+              starred_by: Array.isArray(data.starred_by) ? data.starred_by : [],
+              mentions: Array.isArray(data.mentions) ? data.mentions : [],
+              is_system: !!data.is_system,
+              system_event: data.system_event || undefined,
+              createdAtMs,
+              readBy: Array.isArray(data.readBy) ? data.readBy : [],
+              postShare: postShare || undefined,
+            };
+          });
 
         onUpdate(messagesList);
       },

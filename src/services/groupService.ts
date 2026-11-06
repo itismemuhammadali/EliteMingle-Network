@@ -541,6 +541,7 @@ export interface UpdateGroupDetailsParams {
   privacy?: 'public' | 'private';
   coverUri?: string;
   avatarUri?: string;
+  announcement_only?: boolean;
 }
 
 /**
@@ -600,6 +601,10 @@ export const updateGroupDetails = async (
     } else {
       updates.avatarUri = params.avatarUri;
     }
+  }
+
+  if (params.announcement_only !== undefined) {
+    updates.announcement_only = Boolean(params.announcement_only);
   }
 
   await ref.update(updates);

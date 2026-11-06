@@ -1,17 +1,29 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useRef } from 'react';
+import {
+  Animated,
+  PanResponder,
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import { VoiceMemoPlayer } from './VoiceMemoPlayer';
+import { SystemMessageBubble } from './SystemMessageBubble';
 import { formatStorageUrl } from '../../services/postService';
+import { getParticipantColor } from '../../utils/chatHelpers';
 
 const R = UtilityMethods.wp(3.75);
 
 export interface MessageBubbleProps {
+  id?: string;
   text: string;
   time: string;
   isOutgoing: boolean;
+  senderId?: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'audio';
   senderName?: string;
@@ -29,27 +41,93 @@ export interface MessageBubbleProps {
     senderName?: string;
     mediaType?: 'image' | 'audio';
   };
+  parent_message_id?: string | null;
+  quoted_sender_name?: string | null;
+  quoted_snippet?: string | null;
+  quoted_media_type?: 'image' | 'audio' | null;
+  is_deleted?: boolean;
+  is_edited?: boolean;
+  is_system?: boolean;
+  system_event?: string;
+  isStarred?: boolean;
+  mentions?: string[];
   onPressImage?: (url: string) => void;
   onPressPost?: (postId: string, authorName?: string) => void;
   onLongPress?: () => void;
+  onPressQuoted?: (parentMessageId: string) => void;
+  onSwipeReply?: () => void;
 }
 
 /** Incoming: left, white bubble + grey border. Outgoing: right, purple bubble, white text. */
 function MessageBubbleComponent({
+  id,
   text,
   time,
   isOutgoing,
+  senderId,
   mediaUrl,
   mediaType,
   senderName,
   showSenderName,
   postShare,
   replyTo,
+  parent_message_id,
+  quoted_sender_name,
+  quoted_snippet,
+  quoted_media_type,
+  is_deleted,
+  is_edited,
+  is_system,
+  system_event,
+  isStarred,
+  mentions,
   onPressImage,
   onPressPost,
   onLongPress,
+  onPressQuoted,
+  onSwipeReply,
 }: MessageBubbleProps) {
   const [imgError, setImgError] = useState(false);
+
+  // Swipe-to-reply horizontal translation
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useMemo(() => {
+    if (is_deleted || is_system || !onSwipeReply) {
+      return PanResponder.create({
+        onMoveShouldSetPanResponder: () => false,
+      });
+    }
+
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Active when horizontal right-swipe exceeds 15px and vertical movement is small
+        return gestureState.dx > 15 && Math.abs(gestureState.dy) < 12;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx > 0) {
+          const clamped = Math.min(gestureState.dx * 0.75, 60);
+          translateX.setValue(clamped);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > 40 && onSwipeReply) {
+          onSwipeReply();
+        }
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 8,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    });
+  }, [is_deleted, is_system, onSwipeReply, translateX]);
 
   const formattedMediaUrl = useMemo(
     () => (mediaUrl ? formatStorageUrl(mediaUrl) || mediaUrl : undefined),
@@ -88,6 +166,24 @@ function MessageBubbleComponent({
     [formattedMediaUrl, imgError],
   );
 
+  // Group participant color coding (Req 7)
+  const participantColor = useMemo(
+    () => getParticipantColor(senderId || senderName),
+    [senderId, senderName],
+  );
+
+  // Unified quote payload resolution (Req 1)
+  const quoteId = parent_message_id || replyTo?.id;
+  const quoteSender = quoted_sender_name || replyTo?.senderName;
+  const quoteText =
+    quoted_snippet ||
+    (quoted_media_type === 'image' || replyTo?.mediaType === 'image'
+      ? '📷 Photo'
+      : quoted_media_type === 'audio' || replyTo?.mediaType === 'audio'
+      ? '🎤 Voice memo'
+      : replyTo?.text);
+  const hasQuote = Boolean(!is_deleted && (quoteId || quoteSender || quoteText));
+
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
       wrap: {
@@ -102,10 +198,30 @@ function MessageBubbleComponent({
         alignSelf: 'flex-end',
         alignItems: 'flex-end',
       },
+      swipeContainer: {
+        position: 'relative',
+        flexDirection: 'row',
+        alignItems: 'center',
+      },
+      swipeReplyIcon: {
+        position: 'absolute',
+        left: -32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: Colors.userProfilePurple,
+      },
+      swipeReplyIconText: {
+        color: Colors.white,
+        fontSize: FontSize.VALUE(13),
+        fontWeight: '700',
+      },
       senderNameText: {
         fontSize: FontSize.VALUE(12),
         fontWeight: '700',
-        color: Colors.chartMalePurple,
+        color: participantColor,
         marginBottom: UtilityMethods.hp(0.35),
         marginLeft: UtilityMethods.wp(1.5),
       },
@@ -123,25 +239,47 @@ function MessageBubbleComponent({
       bubbleOut: {
         backgroundColor: Colors.chartMalePurple,
       },
+      bubbleDeletedIn: {
+        backgroundColor: '#F8FAFC',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        paddingVertical: UtilityMethods.hp(0.9),
+      },
+      bubbleDeletedOut: {
+        backgroundColor: '#EDE9FE',
+        borderWidth: 1,
+        borderColor: '#DDD6FE',
+        paddingVertical: UtilityMethods.hp(0.9),
+      },
+      deletedText: {
+        fontSize: FontSize.VALUE(13),
+        fontStyle: 'italic',
+      },
+      deletedTextIn: {
+        color: '#94A3B8',
+      },
+      deletedTextOut: {
+        color: Colors.userProfilePurple,
+      },
       replyQuoteBox: {
         flexDirection: 'row',
         borderRadius: UtilityMethods.wp(2),
         paddingVertical: UtilityMethods.hp(0.6),
-        paddingHorizontal: UtilityMethods.wp(2),
+        paddingHorizontal: UtilityMethods.wp(2.5),
         marginBottom: UtilityMethods.hp(0.8),
       },
       replyQuoteBoxIn: {
         backgroundColor: '#F3F4F6',
-        borderLeftWidth: 3,
+        borderLeftWidth: 3.5,
         borderLeftColor: Colors.chartMalePurple,
       },
       replyQuoteBoxOut: {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderLeftWidth: 3,
+        backgroundColor: 'rgba(255, 255, 255, 0.22)',
+        borderLeftWidth: 3.5,
         borderLeftColor: Colors.white,
       },
       replyQuoteSender: {
-        fontSize: FontSize.VALUE(11),
+        fontSize: FontSize.VALUE(11.5),
         fontWeight: '700',
         marginBottom: UtilityMethods.hp(0.2),
       },
@@ -158,7 +296,7 @@ function MessageBubbleComponent({
         color: Colors.textDark,
       },
       replyQuoteTextOut: {
-        color: 'rgba(255, 255, 255, 0.85)',
+        color: 'rgba(255, 255, 255, 0.9)',
       },
       audioWrap: {
         width: UtilityMethods.wp(68),
@@ -178,6 +316,15 @@ function MessageBubbleComponent({
       },
       bodyOut: {
         color: Colors.white,
+      },
+      mentionIn: {
+        fontWeight: '700',
+        color: Colors.chartMalePurple,
+      },
+      mentionOut: {
+        fontWeight: '800',
+        color: '#FEF08A',
+        textDecorationLine: 'underline',
       },
       postShareCard: {
         borderRadius: UtilityMethods.wp(2.5),
@@ -276,220 +423,288 @@ function MessageBubbleComponent({
       postShareViewTextOut: {
         color: Colors.white,
       },
-      time: {
+      timeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginTop: UtilityMethods.hp(0.45),
+      },
+      timeRowIn: {
+        alignSelf: 'flex-start',
+      },
+      timeRowOut: {
+        alignSelf: 'flex-end',
+      },
+      time: {
         fontSize: FontSize.VALUE(11),
         color: Colors.placeholderGrey,
       },
-      timeIn: {
-        alignSelf: 'flex-start',
+      editedLabel: {
+        fontSize: FontSize.VALUE(10.5),
+        fontStyle: 'italic',
+        color: Colors.placeholderGrey,
+        marginRight: UtilityMethods.wp(1),
       },
-      timeOut: {
-        alignSelf: 'flex-end',
+      starIcon: {
+        fontSize: FontSize.VALUE(10.5),
+        marginRight: UtilityMethods.wp(1),
       },
     }),
   );
 
+  // Render System / Event Messages (Req 6)
+  if (is_system) {
+    return <SystemMessageBubble text={text} time={time} event={system_event} />;
+  }
+
+  // Helper to highlight mentions in text (Req 4)
+  const renderFormattedText = (rawText: string) => {
+    // Regex matching @username or @Full Name tokens
+    const mentionRegex = /(@[A-Za-z0-9_]+(?:\s+[A-Za-z0-9_]+)?)/g;
+    const parts = rawText.split(mentionRegex);
+
+    return (
+      <Text style={[styles.body, isOutgoing ? styles.bodyOut : styles.bodyIn]}>
+        {parts.map((part, index) => {
+          if (part.startsWith('@')) {
+            return (
+              <Text
+                key={index}
+                style={isOutgoing ? styles.mentionOut : styles.mentionIn}
+              >
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+
   return (
     <View style={[styles.wrap, isOutgoing ? styles.wrapOut : styles.wrapIn]}>
+      {/* Group Participant Name (Req 7) */}
       {!isOutgoing && showSenderName && senderName ? (
         <Text style={styles.senderNameText} numberOfLines={1}>
           {senderName}
         </Text>
       ) : null}
 
-      <TouchableOpacity
-        activeOpacity={0.88}
-        onLongPress={onLongPress}
-        delayLongPress={300}
-      >
-        {isVoiceMemo && (formattedMediaUrl || mediaUrl) ? (
-          <View style={styles.audioWrap}>
-            {replyTo ? (
-              <View
-                style={[
-                  styles.replyQuoteBox,
-                  isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.replyQuoteSender,
-                      isOutgoing ? styles.replyQuoteSenderOut : styles.replyQuoteSenderIn,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {replyTo.senderName || 'Replied Message'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.replyQuoteText,
-                      isOutgoing ? styles.replyQuoteTextOut : styles.replyQuoteTextIn,
-                    ]}
-                    numberOfLines={2}
-                  >
-                    {replyTo.mediaType === 'image'
-                      ? '📷 Photo'
-                      : replyTo.mediaType === 'audio'
-                      ? '🎤 Voice memo'
-                      : replyTo.text}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-            <VoiceMemoPlayer audioUri={formattedMediaUrl || mediaUrl!} showDelete={false} />
-          </View>
-        ) : showText || postShare || (isPhoto && imageSource && !imgError) ? (
-          <View
-            style={[
-              styles.bubble,
-              isOutgoing ? styles.bubbleOut : styles.bubbleIn,
-            ]}
+      {/* Swipeable & Touchable Bubble Container */}
+      <View style={styles.swipeContainer} {...panResponder.panHandlers}>
+        <View style={styles.swipeReplyIcon}>
+          <Text style={styles.swipeReplyIconText}>↩</Text>
+        </View>
+
+        <Animated.View style={{ transform: [{ translateX }] }}>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            onLongPress={onLongPress}
+            delayLongPress={300}
           >
-            {replyTo ? (
+            {/* Deleted Message Placeholder (Req 3) */}
+            {is_deleted ? (
               <View
                 style={[
-                  styles.replyQuoteBox,
-                  isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
+                  styles.bubble,
+                  isOutgoing ? styles.bubbleDeletedOut : styles.bubbleDeletedIn,
                 ]}
               >
-                <View style={{ flex: 1 }}>
-                  <Text
+                <Text
+                  style={[
+                    styles.deletedText,
+                    isOutgoing ? styles.deletedTextOut : styles.deletedTextIn,
+                  ]}
+                >
+                  🚫 This message was deleted
+                </Text>
+              </View>
+            ) : isVoiceMemo && (formattedMediaUrl || mediaUrl) ? (
+              <View style={styles.audioWrap}>
+                {hasQuote ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => quoteId && onPressQuoted && onPressQuoted(quoteId)}
                     style={[
-                      styles.replyQuoteSender,
-                      isOutgoing ? styles.replyQuoteSenderOut : styles.replyQuoteSenderIn,
+                      styles.replyQuoteBox,
+                      isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
                     ]}
-                    numberOfLines={1}
                   >
-                    {replyTo.senderName || 'Replied Message'}
-                  </Text>
-                  <Text
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.replyQuoteSender,
+                          isOutgoing ? styles.replyQuoteSenderOut : styles.replyQuoteSenderIn,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {quoteSender || 'Replied Message'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.replyQuoteText,
+                          isOutgoing ? styles.replyQuoteTextOut : styles.replyQuoteTextIn,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {quoteText}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+                <VoiceMemoPlayer audioUri={formattedMediaUrl || mediaUrl!} showDelete={false} />
+              </View>
+            ) : showText || postShare || (isPhoto && imageSource && !imgError) ? (
+              <View
+                style={[
+                  styles.bubble,
+                  isOutgoing ? styles.bubbleOut : styles.bubbleIn,
+                ]}
+              >
+                {/* Quoted block inside message bubble (Req 1) */}
+                {hasQuote ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => quoteId && onPressQuoted && onPressQuoted(quoteId)}
                     style={[
-                      styles.replyQuoteText,
-                      isOutgoing ? styles.replyQuoteTextOut : styles.replyQuoteTextIn,
+                      styles.replyQuoteBox,
+                      isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
                     ]}
-                    numberOfLines={2}
                   >
-                    {replyTo.mediaType === 'image'
-                      ? '📷 Photo'
-                      : replyTo.mediaType === 'audio'
-                      ? '🎤 Voice memo'
-                      : replyTo.text}
-                  </Text>
-                </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.replyQuoteSender,
+                          isOutgoing ? styles.replyQuoteSenderOut : styles.replyQuoteSenderIn,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {quoteSender || 'Replied Message'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.replyQuoteText,
+                          isOutgoing ? styles.replyQuoteTextOut : styles.replyQuoteTextIn,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {quoteText}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Shared Post Card */}
+                {postShare ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.postShareCard,
+                      isOutgoing ? styles.postShareCardOut : styles.postShareCardIn,
+                    ]}
+                    activeOpacity={0.88}
+                    onPress={() => onPressPost && onPressPost(postShare.postId, postShare.authorName)}
+                  >
+                    <View
+                      style={[
+                        styles.postShareHeader,
+                        isOutgoing && styles.postShareHeaderOut,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.postShareBadge,
+                          isOutgoing && styles.postShareBadgeOut,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.postShareBadgeText,
+                            isOutgoing && styles.postShareBadgeTextOut,
+                          ]}
+                        >
+                          POST
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.postShareAuthor,
+                          isOutgoing ? styles.postShareAuthorOut : styles.postShareAuthorIn,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {postShare.authorName ? `${postShare.authorName}'s post` : 'Shared Post'}
+                      </Text>
+                    </View>
+
+                    {postShare.mediaUrl ? (
+                      <Image
+                        source={{ uri: formatStorageUrl(postShare.mediaUrl) || postShare.mediaUrl }}
+                        style={styles.postShareMedia}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+
+                    {postShare.content ? (
+                      <View style={styles.postShareBody}>
+                        <Text
+                          style={[
+                            styles.postShareContent,
+                            isOutgoing ? styles.postShareContentOut : styles.postShareContentIn,
+                          ]}
+                          numberOfLines={3}
+                        >
+                          {postShare.content}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    <View
+                      style={[
+                        styles.postShareFooter,
+                        isOutgoing && styles.postShareFooterOut,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.postShareViewText,
+                          isOutgoing ? styles.postShareViewTextOut : styles.postShareViewTextIn,
+                        ]}
+                      >
+                        View post ›
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Photo Attachment */}
+                {isPhoto && imageSource && !imgError ? (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => onPressImage && onPressImage(formattedMediaUrl || mediaUrl!)}
+                  >
+                    <Image
+                      source={imageSource}
+                      style={styles.imageBubble}
+                      resizeMode="cover"
+                      onError={() => setImgError(true)}
+                    />
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Text Content with Mention Highlighting */}
+                {showText ? renderFormattedText(displayableText) : null}
               </View>
             ) : null}
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
 
-            {postShare ? (
-              <TouchableOpacity
-                style={[
-                  styles.postShareCard,
-                  isOutgoing ? styles.postShareCardOut : styles.postShareCardIn,
-                ]}
-                activeOpacity={0.88}
-                onPress={() => onPressPost && onPressPost(postShare.postId, postShare.authorName)}
-              >
-                <View
-                  style={[
-                    styles.postShareHeader,
-                    isOutgoing && styles.postShareHeaderOut,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.postShareBadge,
-                      isOutgoing && styles.postShareBadgeOut,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.postShareBadgeText,
-                        isOutgoing && styles.postShareBadgeTextOut,
-                      ]}
-                    >
-                      POST
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.postShareAuthor,
-                      isOutgoing ? styles.postShareAuthorOut : styles.postShareAuthorIn,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {postShare.authorName ? `${postShare.authorName}'s post` : 'Shared Post'}
-                  </Text>
-                </View>
-
-                {postShare.mediaUrl ? (
-                  <Image
-                    source={{ uri: formatStorageUrl(postShare.mediaUrl) || postShare.mediaUrl }}
-                    style={styles.postShareMedia}
-                    resizeMode="cover"
-                  />
-                ) : null}
-
-                {postShare.content ? (
-                  <View style={styles.postShareBody}>
-                    <Text
-                      style={[
-                        styles.postShareContent,
-                        isOutgoing ? styles.postShareContentOut : styles.postShareContentIn,
-                      ]}
-                      numberOfLines={3}
-                    >
-                      {postShare.content}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View
-                  style={[
-                    styles.postShareFooter,
-                    isOutgoing && styles.postShareFooterOut,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.postShareViewText,
-                      isOutgoing ? styles.postShareViewTextOut : styles.postShareViewTextIn,
-                    ]}
-                  >
-                    View post ›
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ) : null}
-
-            {isPhoto && imageSource && !imgError ? (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => onPressImage && onPressImage(formattedMediaUrl || mediaUrl!)}
-              >
-                <Image
-                  source={imageSource}
-                  style={styles.imageBubble}
-                  resizeMode="cover"
-                  onError={() => setImgError(true)}
-                />
-              </TouchableOpacity>
-            ) : null}
-
-            {showText ? (
-              <Text
-                style={[styles.body, isOutgoing ? styles.bodyOut : styles.bodyIn]}
-              >
-                {displayableText}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-      </TouchableOpacity>
-
-      <Text style={[styles.time, isOutgoing ? styles.timeOut : styles.timeIn]}>
-        {time}
-      </Text>
+      {/* Timestamp, Edited & Star indicator */}
+      <View style={[styles.timeRow, isOutgoing ? styles.timeRowOut : styles.timeRowIn]}>
+        {isStarred ? <Text style={styles.starIcon}>⭐</Text> : null}
+        {is_edited ? <Text style={styles.editedLabel}>edited</Text> : null}
+        <Text style={styles.time}>{time}</Text>
+      </View>
     </View>
   );
 }
@@ -498,6 +713,7 @@ export const MessageBubble = React.memo(
   MessageBubbleComponent,
   (prevProps, nextProps) => {
     return (
+      prevProps.id === nextProps.id &&
       prevProps.text === nextProps.text &&
       prevProps.time === nextProps.time &&
       prevProps.isOutgoing === nextProps.isOutgoing &&
@@ -505,6 +721,12 @@ export const MessageBubble = React.memo(
       prevProps.mediaType === nextProps.mediaType &&
       prevProps.senderName === nextProps.senderName &&
       prevProps.showSenderName === nextProps.showSenderName &&
+      prevProps.is_deleted === nextProps.is_deleted &&
+      prevProps.is_edited === nextProps.is_edited &&
+      prevProps.is_system === nextProps.is_system &&
+      prevProps.isStarred === nextProps.isStarred &&
+      prevProps.parent_message_id === nextProps.parent_message_id &&
+      prevProps.quoted_snippet === nextProps.quoted_snippet &&
       prevProps.postShare?.postId === nextProps.postShare?.postId &&
       prevProps.replyTo?.id === nextProps.replyTo?.id &&
       prevProps.replyTo?.text === nextProps.replyTo?.text

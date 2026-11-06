@@ -127,4 +127,16 @@ export { BciScanIndicator } from './BciScanIndicator';
 export { ReportPostModal } from './ReportPostModal';
 export type { ReportPostModalProps } from './ReportPostModal';
 export { InAppNotificationToast } from './InAppNotificationToast';
+export { QuotedMessagePreview } from './QuotedMessagePreview';
+export type { QuotedMessagePreviewProps } from './QuotedMessagePreview';
+export { SystemMessageBubble } from './SystemMessageBubble';
+export type { SystemMessageBubbleProps } from './SystemMessageBubble';
+export { GroupMentionsOverlay } from './GroupMentionsOverlay';
+export type { GroupMentionsOverlayProps, MentionParticipant } from './GroupMentionsOverlay';
+export { ChatMessageContextMenu } from './ChatMessageContextMenu';
+export type { ChatMessageContextMenuProps } from './ChatMessageContextMenu';
+export { MessageInfoModal } from './MessageInfoModal';
+export type { MessageInfoModalProps } from './MessageInfoModal';
+export { ForwardMessageModal } from './ForwardMessageModal';
+export type { ForwardMessageModalProps } from './ForwardMessageModal';
 
