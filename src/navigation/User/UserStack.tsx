@@ -1,6 +1,8 @@
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { UserProfileProvider } from '../../components/user/UserProfileContext';
+import { InAppNotificationToast } from '../../components/user/InAppNotificationToast';
 import { UserMainScreen } from '../../screens/user/UserMainScreen';
 import { ChatScreen } from '../../screens/user/ChatScreen';
 import { CreateGroupScreen } from '../../screens/user/CreateGroupScreen';
@@ -23,30 +25,39 @@ const Stack = createNativeStackNavigator<UserStackParamList>();
 export function UserStack() {
   return (
     <UserProfileProvider>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-        }}
-      >
-        <Stack.Screen name="UserMain" component={UserMainScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
-        <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
-        <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
-        <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
-        <Stack.Screen
-          name="UserChangePassword"
-          component={UserChangePasswordScreen}
-        />
-        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-        <Stack.Screen name="OtherUserProfile" component={OtherUserProfileScreen} />
-        <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
-        <Stack.Screen name="Chat" component={ChatScreen} />
-        <Stack.Screen name="PostComments" component={PostCommentsScreen} />
-        <Stack.Screen name="FindFriends" component={FindFriendsScreen} />
-        <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
-        <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
-      </Stack.Navigator>
+      <View style={styles.container}>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
+          <Stack.Screen name="UserMain" component={UserMainScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
+          <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+          <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
+          <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
+          <Stack.Screen
+            name="UserChangePassword"
+            component={UserChangePasswordScreen}
+          />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="OtherUserProfile" component={OtherUserProfileScreen} />
+          <Stack.Screen name="GroupDetail" component={GroupDetailScreen} />
+          <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen name="PostComments" component={PostCommentsScreen} />
+          <Stack.Screen name="FindFriends" component={FindFriendsScreen} />
+          <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
+          <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
+        </Stack.Navigator>
+        <InAppNotificationToast />
+      </View>
     </UserProfileProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});

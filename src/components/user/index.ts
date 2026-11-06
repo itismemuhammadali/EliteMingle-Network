@@ -126,4 +126,5 @@ export { VoiceCommandFloatingIndicator } from './VoiceCommandFloatingIndicator';
 export { BciScanIndicator } from './BciScanIndicator';
 export { ReportPostModal } from './ReportPostModal';
 export type { ReportPostModalProps } from './ReportPostModal';
+export { InAppNotificationToast } from './InAppNotificationToast';
 

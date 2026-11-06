@@ -37,6 +37,7 @@ import {
 import { Colors } from '../../../constants/colors';
 import {
   getOrCreateDirectConversation,
+  getOrCreateGroupConversation,
   sendMessage as sendChatMessage,
   uploadChatImage,
   uploadChatAudio,
@@ -122,13 +123,21 @@ export function ChatScreen() {
   } = route.params || {};
 
   const isGroupHint = Boolean(
+    (route.params as any)?.isGroup ||
     isOnlineStatus === false ||
     initialConvId?.startsWith('group_') ||
-    (route.params as any)?.isGroup ||
+    peerId?.startsWith('group_') ||
     statusText?.toLowerCase().includes('member')
   );
 
   const [isGroupChat, setIsGroupChat] = useState<boolean>(isGroupHint);
+
+  const normalizedGroupId = useMemo(() => {
+    if (peerId && peerId.startsWith('group_')) return peerId.replace(/^group_/, '');
+    if (initialConvId && initialConvId.startsWith('group_')) return initialConvId.replace(/^group_/, '');
+    if (isGroupChat) return peerId;
+    return '';
+  }, [peerId, initialConvId, isGroupChat]);
   const [currentPeerName, setCurrentPeerName] = useState<string>(
     peerName && peerName !== 'Anonymous User' ? peerName : 'User',
   );
@@ -166,12 +175,12 @@ export function ChatScreen() {
 
   // Dynamically resolve peer / group metadata from Firestore
   useEffect(() => {
-    if (!peerId) return;
-
     if (isGroupChat) {
+      const gId = normalizedGroupId;
+      if (!gId) return;
       const unsub = firestore()
         .collection('groups')
-        .doc(peerId)
+        .doc(gId)
         .onSnapshot(docSnap => {
           if (docSnap && checkDocExists(docSnap)) {
             const data = docSnap.data();
@@ -182,6 +191,7 @@ export function ChatScreen() {
         });
       return () => unsub();
     } else {
+      if (!peerId) return;
       const unsub = firestore()
         .collection('users')
         .doc(peerId)
@@ -201,7 +211,7 @@ export function ChatScreen() {
         });
       return () => unsub();
     }
-  }, [peerId, isGroupChat]);
+  }, [peerId, normalizedGroupId, isGroupChat]);
 
   // Check conversation document type
   useEffect(() => {
@@ -245,17 +255,30 @@ export function ChatScreen() {
     async function initChat() {
       let convId = initialConvId;
 
-      if (!convId && currentUserId && peerId) {
-        try {
-          convId = await getOrCreateDirectConversation(currentUserId, peerId, {
-            name: currentPeerName,
-            avatarUri: currentPeerAvatar,
-          });
+      if (!convId && currentUserId) {
+        if (isGroupChat && normalizedGroupId) {
+          convId = `group_${normalizedGroupId}`;
           if (isMounted) {
             setActiveConvId(convId);
           }
-        } catch (err) {
-          console.error('Error getting/creating conversation:', err);
+          getOrCreateGroupConversation(
+            normalizedGroupId,
+            currentPeerName,
+            [currentUserId],
+            currentPeerAvatar,
+          ).catch((err: any) => console.warn('getOrCreateGroupConversation error:', err));
+        } else if (peerId && !isGroupChat) {
+          try {
+            convId = await getOrCreateDirectConversation(currentUserId, peerId, {
+              name: currentPeerName,
+              avatarUri: currentPeerAvatar,
+            });
+            if (isMounted) {
+              setActiveConvId(convId);
+            }
+          } catch (err) {
+            console.error('Error getting/creating conversation:', err);
+          }
         }
       }
 
@@ -263,15 +286,15 @@ export function ChatScreen() {
         markConversationAsRead(convId, currentUserId);
         markChatNotificationsAsRead(currentUserId, {
           conversationId: convId,
-          peerId,
-          groupId: isGroupChat ? peerId : undefined,
+          peerId: isGroupChat ? undefined : peerId,
+          groupId: isGroupChat ? (normalizedGroupId || peerId) : undefined,
         });
         unsubscribe = subscribeToMessages(convId, currentUserId, realTimeMsgs => {
           setMessages(realTimeMsgs);
           markChatNotificationsAsRead(currentUserId, {
             conversationId: convId,
-            peerId,
-            groupId: isGroupChat ? peerId : undefined,
+            peerId: isGroupChat ? undefined : peerId,
+            groupId: isGroupChat ? (normalizedGroupId || peerId) : undefined,
           });
         });
       }
@@ -288,14 +311,14 @@ export function ChatScreen() {
         setActiveChat(currentUserId, null);
       }
     };
-  }, [initialConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar, isGroupChat]);
+  }, [initialConvId, currentUserId, peerId, normalizedGroupId, currentPeerName, currentPeerAvatar, isGroupChat]);
 
   // Set active chat and automatically mark unread notifications for this chat as read
   useEffect(() => {
     if (!currentUserId) return;
-    const targetConvId = activeConvId || initialConvId;
-    const targetPeerId = peerId;
-    const targetGroupId = isGroupChat ? peerId : undefined;
+    const targetConvId = activeConvId || initialConvId || (isGroupChat && normalizedGroupId ? `group_${normalizedGroupId}` : undefined);
+    const targetPeerId = isGroupChat ? undefined : peerId;
+    const targetGroupId = isGroupChat ? (normalizedGroupId || peerId) : undefined;
 
     // Set user active chat presence
     setActiveChat(currentUserId, {
@@ -375,15 +398,20 @@ export function ChatScreen() {
     setReplyingTo(null);
 
     let convId = activeConvId;
-    if (!convId && currentUserId && peerId) {
-      try {
-        convId = await getOrCreateDirectConversation(currentUserId, peerId, {
-          name: currentPeerName,
-          avatarUri: currentPeerAvatar,
-        });
+    if (!convId && currentUserId) {
+      if (isGroupChat && normalizedGroupId) {
+        convId = `group_${normalizedGroupId}`;
         setActiveConvId(convId);
-      } catch (err) {
-        console.error('Error creating conversation before sending message:', err);
+      } else if (peerId && !isGroupChat) {
+        try {
+          convId = await getOrCreateDirectConversation(currentUserId, peerId, {
+            name: currentPeerName,
+            avatarUri: currentPeerAvatar,
+          });
+          setActiveConvId(convId);
+        } catch (err) {
+          console.error('Error creating conversation before sending message:', err);
+        }
       }
     }
 
@@ -427,15 +455,20 @@ export function ChatScreen() {
         if (assets.length === 0) return;
 
         let convId = activeConvId;
-        if (!convId && currentUserId && peerId) {
-          try {
-            convId = await getOrCreateDirectConversation(currentUserId, peerId, {
-              name: currentPeerName,
-              avatarUri: currentPeerAvatar,
-            });
+        if (!convId && currentUserId) {
+          if (isGroupChat && normalizedGroupId) {
+            convId = `group_${normalizedGroupId}`;
             setActiveConvId(convId);
-          } catch (err) {
-            console.error('Error creating conversation for image:', err);
+          } else if (peerId && !isGroupChat) {
+            try {
+              convId = await getOrCreateDirectConversation(currentUserId, peerId, {
+                name: currentPeerName,
+                avatarUri: currentPeerAvatar,
+              });
+              setActiveConvId(convId);
+            } catch (err) {
+              console.error('Error creating conversation for image:', err);
+            }
           }
         }
 
@@ -512,12 +545,17 @@ export function ChatScreen() {
       if (!localAudioPath) return;
 
       let convId = activeConvId;
-      if (!convId && currentUserId && peerId) {
-        convId = await getOrCreateDirectConversation(currentUserId, peerId, {
-          name: currentPeerName,
-          avatarUri: currentPeerAvatar,
-        });
-        setActiveConvId(convId);
+      if (!convId && currentUserId) {
+        if (isGroupChat && normalizedGroupId) {
+          convId = `group_${normalizedGroupId}`;
+          setActiveConvId(convId);
+        } else if (peerId && !isGroupChat) {
+          convId = await getOrCreateDirectConversation(currentUserId, peerId, {
+            name: currentPeerName,
+            avatarUri: currentPeerAvatar,
+          });
+          setActiveConvId(convId);
+        }
       }
 
       if (convId) {

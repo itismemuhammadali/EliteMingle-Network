@@ -319,6 +319,7 @@ export function GroupDetailScreen() {
         peerAvatarUri: group.avatarUri || '',
         statusText: `${group.memberCount} members`,
         isOnlineStatus: false,
+        isGroup: true,
       });
     } catch (err) {
       console.error('Failed to open group chat:', err);

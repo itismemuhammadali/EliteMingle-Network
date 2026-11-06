@@ -75,17 +75,42 @@ export function NotificationsScreen() {
       markNotificationAsRead(item.id);
 
       if (item.type === 'message') {
-        const isGroup = !!item.groupId || (item.conversationId && item.conversationId.startsWith('group_'));
+        const hasGroupInTitle = Boolean(item.title && item.title.includes(' in '));
+        const isGroup = Boolean(
+          item.groupId ||
+          (item.conversationId && item.conversationId.startsWith('group_')) ||
+          hasGroupInTitle ||
+          item.groupName,
+        );
+
         if (isGroup) {
-          const groupName = item.groupName || item.title.split(' in ')[1] || 'Group Chat';
-          const targetGroupId = item.groupId || item.conversationId?.replace(/^group_/, '') || '';
+          let groupName = item.groupName;
+          if (!groupName && hasGroupInTitle) {
+            groupName = item.title.split(' in ')[1]?.trim();
+          }
+          if (!groupName) groupName = 'Group Chat';
+
+          const targetGroupId =
+            (item.groupId && item.groupId.trim()) ||
+            (item.conversationId && item.conversationId.startsWith('group_')
+              ? item.conversationId.replace(/^group_/, '')
+              : '');
+
+          const finalConvId =
+            item.conversationId && item.conversationId.startsWith('group_')
+              ? item.conversationId
+              : targetGroupId
+              ? `group_${targetGroupId}`
+              : '';
+
           navigation.navigate('Chat', {
-            conversationId: item.conversationId,
-            peerId: targetGroupId,
+            conversationId: finalConvId,
+            peerId: targetGroupId || finalConvId,
             peerName: groupName,
             peerAvatarUri: '',
             statusText: 'Group',
             isOnlineStatus: false,
+            isGroup: true,
           });
           return;
         }
@@ -98,6 +123,7 @@ export function NotificationsScreen() {
           peerAvatarUri: '',
           statusText: 'Online',
           isOnlineStatus: true,
+          isGroup: false,
         });
         return;
       }

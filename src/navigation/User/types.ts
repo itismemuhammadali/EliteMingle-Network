@@ -25,6 +25,7 @@ export type UserStackParamList = {
     statusText?: string;
     /** Green "Online" when true; muted when false (e.g. group member count). */
     isOnlineStatus?: boolean;
+    isGroup?: boolean;
   };
   PostComments: {
     postId: string;

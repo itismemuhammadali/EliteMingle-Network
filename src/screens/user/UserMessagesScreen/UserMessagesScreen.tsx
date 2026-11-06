@@ -76,13 +76,15 @@ export function UserMessagesScreen() {
         });
       }
       if (isGroup) {
+        const rawGroupId = item.id.replace(/^group_/, '');
         navigation.navigate('Chat', {
           conversationId: item.id,
-          peerId: item.id,
+          peerId: rawGroupId,
           peerName: item.name,
           peerAvatarUri: item.avatarUris?.[0] || '',
           statusText: item.memberLabel,
           isOnlineStatus: false,
+          isGroup: true,
         });
       } else {
         navigation.navigate('Chat', {

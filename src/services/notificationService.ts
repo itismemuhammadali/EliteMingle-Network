@@ -45,8 +45,8 @@ function buildTitle(
     case 'friend_accept':
       return `${actorName} accepted your friend request`;
     case 'message':
-      return groupName
-        ? `${actorName} sent a message in ${groupName}`
+      return groupName && groupName.trim().length > 0
+        ? `${actorName} in ${groupName.trim()}`
         : `New message from ${actorName}`;
     default:
       return `${actorName} sent you a notification`;

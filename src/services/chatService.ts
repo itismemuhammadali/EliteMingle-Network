@@ -186,9 +186,11 @@ export const getOrCreateGroupConversation = async (
   const base: Record<string, any> = {
     id: conversationId,
     type: 'group',
-    participants: memberIds,
+    groupId,
     groupName,
+    name: groupName,
     groupAvatar,
+    participants: memberIds,
     memberLabel: `${memberIds.length} members`,
     updatedAt: firestore.FieldValue.serverTimestamp(),
   };
@@ -310,6 +312,9 @@ export const sendMessage = async ({
   let notifGroupName: string | undefined;
   let notifGroupId: string | undefined;
 
+  const isGroupConv = conversationId.startsWith('group_');
+  const derivedGroupId = isGroupConv ? conversationId.replace(/^group_/, '') : undefined;
+
   if (convSnapExists) {
     const data = convSnap.data() as ConversationDocument & {
       groupName?: string;
@@ -318,16 +323,63 @@ export const sendMessage = async ({
     };
     const participants = data.participants || [];
     recipients = participants.filter(pId => pId !== senderId);
-    recipients.forEach(pId => {
-      updateData[`unreadCount.${pId}`] = firestore.FieldValue.increment(1);
-    });
-    if (data.type === 'group' || conversationId.startsWith('group_')) {
-      notifGroupName = data.groupName || data.name || 'Group';
-      notifGroupId = data.groupId || conversationId.replace(/^group_/, '');
+    if (data.type === 'group' || isGroupConv) {
+      notifGroupName = data.groupName || data.name;
+      notifGroupId = data.groupId || derivedGroupId;
+    }
+  } else if (isGroupConv) {
+    notifGroupId = derivedGroupId;
+  }
+
+  // If this is a group conversation, ensure group details & members are populated accurately
+  if (isGroupConv || notifGroupId) {
+    const gId = notifGroupId || derivedGroupId || '';
+    notifGroupId = gId;
+    try {
+      const groupSnap = await firestore().collection('groups').doc(gId).get();
+      const gExists = typeof (groupSnap as any).exists === 'function' ? groupSnap.exists() : groupSnap.exists;
+      if (groupSnap && gExists) {
+        const gData = groupSnap.data() || {};
+        if (!notifGroupName || notifGroupName === 'Group') {
+          notifGroupName = gData.name || 'Group';
+        }
+        const groupMembers = (gData.members as string[]) || [];
+        if (groupMembers.length > 0) {
+          const freshRecipients = groupMembers.filter(m => m !== senderId);
+          recipients = Array.from(new Set([...recipients, ...freshRecipients]));
+          updateData.participants = Array.from(
+            new Set([...(updateData.participants || []), ...groupMembers]),
+          );
+        }
+      }
+    } catch (gErr) {
+      console.warn('Failed to load group details in sendMessage:', gErr);
+    }
+    updateData.type = 'group';
+    updateData.groupId = gId;
+    if (notifGroupName) {
+      updateData.groupName = notifGroupName;
+      updateData.name = notifGroupName;
     }
   }
 
-  batch.update(convRef, updateData);
+  recipients.forEach(pId => {
+    updateData[`unreadCount.${pId}`] = firestore.FieldValue.increment(1);
+  });
+
+  if (convSnapExists) {
+    batch.update(convRef, updateData);
+  } else {
+    batch.set(
+      convRef,
+      {
+        id: conversationId,
+        createdAt: timestamp,
+        ...updateData,
+      },
+      { merge: true },
+    );
+  }
   await batch.commit();
 
   // Notify each recipient about the new message (best-effort, non-blocking).
