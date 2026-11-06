@@ -344,7 +344,7 @@ export function PostCommentsScreen() {
       </Text>
       <KeyboardAvoidingView
         style={layoutStyles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
         <FlatList

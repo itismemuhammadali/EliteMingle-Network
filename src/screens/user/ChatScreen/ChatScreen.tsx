@@ -339,18 +339,29 @@ export function ChatScreen() {
 
   // Listen to keyboard events
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const show = Keyboard.addListener(showEvent, () => {
-      setShowEmojiPicker(false);
-      setKeyboardOpen(true);
-    });
-    const hide = Keyboard.addListener(hideEvent, () => {
-      setKeyboardOpen(false);
-    });
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setShowEmojiPicker(false);
+        setKeyboardOpen(true);
+      },
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardOpen(false);
+      },
+    );
+    // Extra safety listener for Android flavors where keyboardDidHide is the primary event
+    const androidHideSub =
+      Platform.OS === 'android'
+        ? Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false))
+        : null;
+
     return () => {
-      show.remove();
-      hide.remove();
+      showSub.remove();
+      hideSub.remove();
+      androidHideSub?.remove();
     };
   }, []);
 
@@ -1133,7 +1144,7 @@ export function ChatScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? topInset : 0}
       >
         {listData.length > 0 ? (
