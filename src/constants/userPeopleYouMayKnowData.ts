@@ -13,6 +13,11 @@ export type SuggestedPerson = {
   nearby: boolean;
   /** Shown on the Interests tab */
   interestsMatch: boolean;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  distanceKm?: number;
 };
 
 export const SUGGESTED_PEOPLE: SuggestedPerson[] = [

@@ -201,6 +201,25 @@ export const removeFriend = async (
   batch.delete(ref1);
   batch.delete(ref2);
 
+  // Clean up any friend request record between both users so they can connect again if needed
+  try {
+    const reqs1 = await firestore()
+      .collection('friend_requests')
+      .where('senderId', '==', userId)
+      .where('receiverId', '==', friendId)
+      .get();
+    reqs1.docs.forEach(doc => batch.delete(doc.ref));
+
+    const reqs2 = await firestore()
+      .collection('friend_requests')
+      .where('senderId', '==', friendId)
+      .where('receiverId', '==', userId)
+      .get();
+    reqs2.docs.forEach(doc => batch.delete(doc.ref));
+  } catch (err) {
+    console.warn('Error cleaning up friend_requests during unfriend:', err);
+  }
+
   await batch.commit();
 };
 

@@ -30,6 +30,7 @@
     "formik": "^2.4.9",
     "react": "19.1.1",
     "react-native": "^0.82.1",
+    "react-native-geolocation-service": "^5.3.1",
     "react-native-gesture-handler": "^2.30.0",
     "react-native-gifted-charts": "^1.4.76",
     "react-native-ico-flags": "^6.4.1",

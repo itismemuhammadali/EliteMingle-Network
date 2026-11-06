@@ -28,7 +28,7 @@ import type { PublicProfileFriendRow } from '../../../constants/publicUserProfil
 import type { UserProfileGroupRow } from '../../../constants/userProfileGroupsData';
 import type { UserFeedPost } from '../../../constants/userFeedData';
 import { subscribeToPosts } from '../../../services/postService';
-import { subscribeToFriends, sendFriendRequest } from '../../../services/friendService';
+import { subscribeToFriends, sendFriendRequest, removeFriend } from '../../../services/friendService';
 import { subscribeToUserGroups } from '../../../services/groupService';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
@@ -308,7 +308,34 @@ export function OtherUserProfileScreen() {
       return;
     }
     if (friendshipStatus === 'friends') {
-      Alert.alert('Friends', `You and ${displayName || 'this user'} are already friends.`);
+      Alert.alert(
+        'Unfriend User',
+        `Are you sure you want to unfriend ${displayName || 'this user'}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Unfriend',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await removeFriend(currentUserId, userId);
+                setFriendshipStatus('none');
+                Alert.alert(
+                  'Unfriended',
+                  `You have unfriended ${displayName || 'this user'}.`,
+                );
+              } catch (err: any) {
+                console.error('Failed to unfriend user:', err);
+                Alert.alert(
+                  'Error',
+                  err?.message || 'Could not unfriend user. Please try again.',
+                );
+              }
+            },
+          },
+        ],
+      );
+      return;
     } else if (friendshipStatus === 'pending_outgoing') {
       Alert.alert('Request Pending', 'You have already sent a friend request to this user.');
     } else if (friendshipStatus === 'pending_incoming') {

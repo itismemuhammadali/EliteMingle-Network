@@ -35,7 +35,7 @@ export function UserPublicProfileActions({
   } else if (isIncoming) {
     friendLabel = 'Accept Request';
   } else if (isFriends) {
-    friendLabel = 'Friends';
+    friendLabel = 'Unfriend';
   }
 
   const styles = useUserFontStyles(() =>
@@ -60,6 +60,11 @@ export function UserPublicProfileActions({
         borderWidth: 1.5,
         borderColor: Colors.userProfilePurple,
       },
+      friendsBtnUnfriend: {
+        backgroundColor: '#FEE2E2',
+        borderWidth: 1,
+        borderColor: '#FCA5A5',
+      },
       friendsLabel: {
         marginLeft: UtilityMethods.wp(2),
         fontSize: FontSize.VALUE(16),
@@ -68,6 +73,9 @@ export function UserPublicProfileActions({
       },
       friendsLabelRequested: {
         color: Colors.userProfilePurple,
+      },
+      friendsLabelUnfriend: {
+        color: '#DC2626',
       },
       messageBtn: {
         flex: 0.42,
@@ -95,6 +103,7 @@ export function UserPublicProfileActions({
         style={[
           styles.friendsBtn,
           isRequested && styles.friendsBtnRequested,
+          isFriends && styles.friendsBtnUnfriend,
         ]}
         onPress={onFriendsPress}
         activeOpacity={0.88}
@@ -104,12 +113,19 @@ export function UserPublicProfileActions({
         <PersonPlusWhiteIcon
           width={ICON}
           height={ICON}
-          color={isRequested ? Colors.userProfilePurple : Colors.white}
+          color={
+            isFriends
+              ? '#DC2626'
+              : isRequested
+              ? Colors.userProfilePurple
+              : Colors.white
+          }
         />
         <Text
           style={[
             styles.friendsLabel,
             isRequested && styles.friendsLabelRequested,
+            isFriends && styles.friendsLabelUnfriend,
           ]}
         >
           {friendLabel}

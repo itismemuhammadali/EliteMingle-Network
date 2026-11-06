@@ -214,9 +214,17 @@ export function PeopleYouMayKnowCard({
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <MapPinSmallIcon size={META_ICON} color={Colors.placeholderGrey} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {person.location}
+            <MapPinSmallIcon size={META_ICON} color={person.distanceKm !== undefined ? Colors.userProfilePurple : Colors.placeholderGrey} />
+            <Text
+              style={[
+                styles.metaText,
+                person.distanceKm !== undefined && { color: Colors.userProfilePurple, fontWeight: '600' },
+              ]}
+              numberOfLines={1}
+            >
+              {person.distanceKm !== undefined
+                ? `${person.distanceKm} km away (${person.location})`
+                : person.location}
             </Text>
           </View>
         </View>
