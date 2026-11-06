@@ -18,6 +18,7 @@ export type UserAppNotification = {
   postId?: string;
   conversationId?: string;
   groupId?: string;
+  groupName?: string;
 };
 
 export const USER_APP_NOTIFICATIONS: UserAppNotification[] = [

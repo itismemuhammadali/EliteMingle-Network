@@ -12,6 +12,7 @@ export type UserProfileState = {
   avatarUri: string | null;
   voiceCommandsEnabled?: boolean;
   ttsEnabled?: boolean;
+  privacySettings?: Record<string, boolean>;
 };
 
 /** Default profile — also used to seed `UserProfileProvider`. */

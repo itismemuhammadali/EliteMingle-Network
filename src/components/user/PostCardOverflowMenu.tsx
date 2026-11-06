@@ -290,15 +290,6 @@ export function PostCardOverflowMenu({
               <BookmarkIcon size={iconSize} />
               <Text style={styles.rowLabel}>Save</Text>
             </TouchableOpacity>
-            <View style={styles.divider} />
-            <TouchableOpacity
-              style={styles.row}
-              onPress={onCopyLink}
-              activeOpacity={0.75}
-            >
-              <CopyIcon size={iconSize} />
-              <Text style={styles.rowLabel}>Copy Link</Text>
-            </TouchableOpacity>
             {isAuthor ? (
               <>
                 <View style={styles.divider} />

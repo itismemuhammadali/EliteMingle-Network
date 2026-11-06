@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppSelector } from '../../redux/hooks';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
@@ -79,6 +80,7 @@ export function UserBottomTabBar({
   onFabPress,
 }: UserBottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const simplifiedUi = useAppSelector(state => state.simplifiedUi);
   const iconSize = UtilityMethods.wp(5.5);
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
@@ -102,12 +104,15 @@ export function UserBottomTabBar({
         alignItems: 'center',
         justifyContent: 'flex-end',
         paddingBottom: UtilityMethods.hp(0.5),
+        paddingHorizontal: UtilityMethods.wp(0.5),
       },
       label: {
         marginTop: UtilityMethods.hp(0.35),
-        fontSize: FontSize.VALUE(9),
+        fontSize: simplifiedUi ? FontSize.VALUE(4) : FontSize.VALUE(9),
         fontWeight: '500',
         color: Colors.userInactiveTabGrey,
+        maxWidth: UtilityMethods.wp(18),
+        textAlign: 'center',
       },
       labelActive: {
         color: Colors.userActiveTabPurple,
@@ -151,7 +156,11 @@ export function UserBottomTabBar({
         activeOpacity={0.75}
       >
         <IconComponent size={iconSize} color={color} />
-        <Text style={[styles.label, isActive && styles.labelActive]}>
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={[styles.label, isActive && styles.labelActive]}
+        >
           {tab.label}
         </Text>
       </TouchableOpacity>

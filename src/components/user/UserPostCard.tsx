@@ -7,25 +7,22 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  Share,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Video from 'react-native-video';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { getPostShareUrl, type UserFeedPost } from '../../constants/userFeedData';
+import type { UserFeedPost } from '../../constants/userFeedData';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
 import PostComment from '../../assets/Icons/BlackComment.svg';
-import PostShare from '../../assets/Icons/blackShare.svg';
 import PostThumbUp from '../../assets/Icons/blackLike.svg';
 import BlackLikeIcon from '../../assets/Icons/blackLike.svg';
 import PurpleLikeIcon from '../../assets/Icons/purpleLike.svg';
 import DotsVertical from '../../assets/Icons/profile/dotsVertical.svg';
 import { UserTabProfileIcon } from './icons/UserTabProfileIcon';
 import { PostCardOverflowMenu } from './PostCardOverflowMenu';
-import { PostCardShareMenu } from './PostCardShareMenu';
 import { ReportPostModal } from './ReportPostModal';
 import { VoiceMemoPlayer } from './VoiceMemoPlayer';
 import { PostTtsButton } from './PostTtsButton';
@@ -33,7 +30,6 @@ import { useAppSelector } from '../../redux/hooks';
 import {
   toggleLike as toggleLikeService,
   subscribeToPostLike,
-  incrementShareCount,
 } from '../../services/postService';
 import type { UserStackParamList } from '../../navigation/User/types';
 
@@ -122,7 +118,6 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
     return () => unsubscribe();
   }, [post.id, currentUserId]);
   const [overflowOpen, setOverflowOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -334,20 +329,6 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
     });
   };
 
-  const handleShare = useCallback(async () => {
-    const postUrl = getPostShareUrl(post.id);
-    try {
-      await Share.share({
-        title: 'EPM4LIFE Post',
-        message: `Check out this post on EPM4LIFE: ${postUrl}`,
-        url: postUrl,
-      });
-      incrementShareCount(post.id).catch(() => {});
-    } catch (err) {
-      console.error('Failed to share post:', err);
-    }
-  }, [post.id]);
-
   const simpIcon = UtilityMethods.wp(5);
 
   if (isHidden) {
@@ -453,7 +434,6 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
             <Text style={styles.statMuted}>{reactionCount}</Text>
           </View>
           <Text style={styles.statMuted}>{post.comments} comments</Text>
-          <Text style={styles.statMuted}>{post.shares} shares</Text>
         </View>
 
         <View style={styles.divider} />
@@ -495,18 +475,6 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
               </View>
               <Text style={styles.simpBtnText}>Comment</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.simpBtn}
-              activeOpacity={0.75}
-              onPress={handleShare}
-              accessibilityRole="button"
-              accessibilityLabel="Share"
-            >
-              <View style={styles.simpBtnIcon}>
-                <PostShare width={simpIcon} height={simpIcon} />
-              </View>
-              <Text style={styles.simpBtnText}>Share</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.actionRow}>
@@ -532,14 +500,6 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
               <PostComment width={ACTION_ICON} height={ACTION_ICON} />
               <Text style={styles.actionText}>Comment</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.7}
-              onPress={handleShare}
-            >
-              <PostShare width={ACTION_ICON} height={ACTION_ICON} />
-              <Text style={styles.actionText}>Share</Text>
-            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -560,11 +520,6 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
         authorName={post.userName}
         postContent={post.content}
         onReportSuccess={() => setIsHidden(true)}
-      />
-      <PostCardShareMenu
-        visible={shareOpen}
-        onClose={() => setShareOpen(false)}
-        postId={post.id}
       />
     </>
   );

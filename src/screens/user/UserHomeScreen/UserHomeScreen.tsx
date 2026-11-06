@@ -13,7 +13,6 @@ import {
   useCreatePostModal,
   useAccessibilityModal,
 } from '../../../components/user';
-import { PostCardShareMenu } from '../../../components/user/PostCardShareMenu';
 import { Colors } from '../../../constants/colors';
 import { type UserFeedFilter } from '../../../constants/userFeedData';
 import type { UserStackParamList } from '../../../navigation/User/types';
@@ -79,8 +78,6 @@ export function UserHomeScreen() {
     );
   }, [realtimePosts, friendIds, blockedIds, currentUserId]);
 
-  const [activeSharePostId, setActiveSharePostId] = useState<string | null>(null);
-
   useEffect(() => {
     const unsub = subscribeToVoiceCommands(cmd => {
       if (feedPosts.length === 0) return;
@@ -117,7 +114,6 @@ export function UserHomeScreen() {
           });
           break;
         case 'ACTION_SHARE_POST':
-          setActiveSharePostId(targetPost.id);
           break;
         default:
           break;
@@ -211,13 +207,6 @@ export function UserHomeScreen() {
           <PeopleYouMayKnowSection filter={filter} />
         )}
       </ScrollView>
-      {activeSharePostId && (
-        <PostCardShareMenu
-          visible={!!activeSharePostId}
-          postId={activeSharePostId}
-          onClose={() => setActiveSharePostId(null)}
-        />
-      )}
     </MainLayout>
   );
 }

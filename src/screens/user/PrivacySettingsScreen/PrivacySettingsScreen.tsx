@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,13 @@ import {
   Switch,
   Alert,
   Linking,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import type { UserStackParamList } from '../../../navigation/User/types';
 import MainLayout from '../../../components/general/MainLayout';
 import ArrowLeftIcon from '../../../assets/Icons/arrowLeft.svg';
@@ -35,6 +39,7 @@ const SWITCH_TRACK = {
 export function PrivacySettingsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
+  const currentUserId = auth().currentUser?.uid || '';
 
   const [publicProfile, setPublicProfile] = useState(true);
   const [showEmail, setShowEmail] = useState(false);
@@ -48,13 +53,89 @@ export function PrivacySettingsScreen() {
   const [allowTagging, setAllowTagging] = useState(true);
   const [commentsOnPosts, setCommentsOnPosts] = useState(true);
 
+  useEffect(() => {
+    if (!currentUserId) return;
+    const unsub = firestore()
+      .collection('users')
+      .doc(currentUserId)
+      .onSnapshot(doc => {
+        if (!doc || !(typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists)) return;
+        const data = doc.data();
+        const priv = data?.privacySettings || {};
+        if (priv.publicProfile !== undefined) setPublicProfile(priv.publicProfile);
+        if (priv.showEmail !== undefined) setShowEmail(priv.showEmail);
+        if (priv.showPhone !== undefined) setShowPhone(priv.showPhone);
+        if (priv.showLocation !== undefined) setShowLocation(priv.showLocation);
+        if (priv.friendRequests !== undefined) setFriendRequests(priv.friendRequests);
+        if (priv.messages !== undefined) setMessages(priv.messages);
+        if (priv.onlineStatus !== undefined) setOnlineStatus(priv.onlineStatus);
+        if (priv.allowTagging !== undefined) setAllowTagging(priv.allowTagging);
+        if (priv.commentsOnPosts !== undefined) setCommentsOnPosts(priv.commentsOnPosts);
+      });
+    return () => unsub();
+  }, [currentUserId]);
+
+  const saveSettings = useCallback(
+    async (partial: Record<string, boolean>) => {
+      if (!currentUserId) return;
+      try {
+        await firestore()
+          .collection('users')
+          .doc(currentUserId)
+          .set(
+            {
+              privacySettings: partial,
+            },
+            { merge: true },
+          );
+      } catch (err) {
+        console.error('Failed to save privacy settings:', err);
+      }
+    },
+    [currentUserId],
+  );
+
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
-  const onSave = useCallback(() => {
-    Alert.alert('Saved', 'Your privacy settings have been updated.');
-  }, []);
+  const onSave = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      await saveSettings({
+        publicProfile,
+        showEmail,
+        showPhone,
+        showLocation,
+        friendRequests,
+        messages,
+        onlineStatus,
+        allowTagging,
+        commentsOnPosts,
+      });
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Privacy settings saved.', ToastAndroid.SHORT);
+      } else {
+        Alert.alert('Saved', 'Your privacy settings have been updated.');
+      }
+      navigation.goBack();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to save privacy settings.');
+    }
+  }, [
+    currentUserId,
+    saveSettings,
+    publicProfile,
+    showEmail,
+    showPhone,
+    showLocation,
+    friendRequests,
+    messages,
+    onlineStatus,
+    allowTagging,
+    commentsOnPosts,
+    navigation,
+  ]);
 
   const onCancel = useCallback(() => {
     navigation.goBack();

@@ -284,13 +284,24 @@ export const sendMessage = async ({
 
   const convSnapExists = typeof (convSnap as any).exists === 'function' ? convSnap.exists() : convSnap.exists;
   let recipients: string[] = [];
+  let notifGroupName: string | undefined;
+  let notifGroupId: string | undefined;
+
   if (convSnapExists) {
-    const data = convSnap.data() as ConversationDocument;
+    const data = convSnap.data() as ConversationDocument & {
+      groupName?: string;
+      groupId?: string;
+      name?: string;
+    };
     const participants = data.participants || [];
     recipients = participants.filter(pId => pId !== senderId);
     recipients.forEach(pId => {
       updateData[`unreadCount.${pId}`] = firestore.FieldValue.increment(1);
     });
+    if (data.type === 'group' || conversationId.startsWith('group_')) {
+      notifGroupName = data.groupName || data.name || 'Group';
+      notifGroupId = data.groupId || conversationId.replace(/^group_/, '');
+    }
   }
 
   batch.update(convRef, updateData);
@@ -303,6 +314,9 @@ export const sendMessage = async ({
       actorId: senderId,
       type: 'message',
       preview: text.trim(),
+      conversationId,
+      groupId: notifGroupId,
+      groupName: notifGroupName,
     });
   });
 

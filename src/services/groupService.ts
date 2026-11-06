@@ -433,3 +433,24 @@ export const transferGroupAdmin = async (
     updatedAt: firestore.FieldValue.serverTimestamp(),
   });
 };
+
+/** Add a user to a group (by group admin/member). */
+export const addMemberToGroup = async (
+  groupId: string,
+  newMemberId: string,
+): Promise<void> => {
+  if (!groupId || !newMemberId) return;
+  const ref = firestore().collection('groups').doc(groupId);
+  await firestore().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error('Group does not exist.');
+    const members = ((snap.data()?.members as string[]) || []).slice();
+    if (members.includes(newMemberId)) return;
+    members.push(newMemberId);
+    tx.update(ref, {
+      members,
+      memberCount: members.length,
+      updatedAt: firestore.FieldValue.serverTimestamp(),
+    });
+  });
+};

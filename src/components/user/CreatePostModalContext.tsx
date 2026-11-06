@@ -6,7 +6,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform, ToastAndroid } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import { CreatePostModal } from './CreatePostModal';
 import { createPost } from '../../services/postService';
@@ -51,7 +51,9 @@ export function CreatePostModalProvider({ children }: { children: ReactNode }) {
         mediaType: mediaType || 'none',
         feeling,
       });
-      Alert.alert('Success', 'Post published to Firestore & Storage!');
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Your post has been shared.', ToastAndroid.SHORT);
+      }
     } catch (error: any) {
       console.error('Failed to publish post:', error);
       Alert.alert('Error Publishing Post', error?.message || 'Could not save post to Firestore.');

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,11 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Share,
+  Modal,
+  ScrollView,
+  Image,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
 import {
   useNavigation,
@@ -32,19 +36,23 @@ import {
   joinGroup,
   leaveGroup,
   transferGroupAdmin,
+  addMemberToGroup,
   type GroupDetail,
 } from '../../../services/groupService';
 import {
   subscribeToGroupPosts,
   createPost,
 } from '../../../services/postService';
-import { getOrCreateGroupConversation } from '../../../services/chatService';
+import {
+  getOrCreateGroupConversation,
+  subscribeToAllUsers,
+  type RegisteredUser,
+} from '../../../services/chatService';
 import { UserTabMessagesIcon } from '../../../components/user/icons';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
 import PeopleIcon from '../../../assets/Icons/people.svg';
 import GroupUserCheckIcon from '../../../assets/Icons/profile/groupUserCheck.svg';
-import GroupShareIcon from '../../../assets/Icons/profile/groupShare.svg';
 
 const H_PAD = UtilityMethods.wp(5);
 
@@ -66,6 +74,9 @@ export function GroupDetailScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [allUsers, setAllUsers] = useState<RegisteredUser[]>([]);
+  const [userSearch, setUserSearch] = useState('');
 
   const currentUserId = auth().currentUser?.uid || '';
 
@@ -84,6 +95,39 @@ export function GroupDetailScreen() {
       unsubPosts();
     };
   }, [groupId, currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const unsub = subscribeToAllUsers(currentUserId, setAllUsers);
+    return () => unsub();
+  }, [currentUserId]);
+
+  const handleAddUser = useCallback(
+    async (user: RegisteredUser) => {
+      if (!group) return;
+      try {
+        await addMemberToGroup(group.id, user.id);
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(`${user.name} added to group!`, ToastAndroid.SHORT);
+        } else {
+          Alert.alert('Success', `${user.name} added to group!`);
+        }
+      } catch (err: any) {
+        Alert.alert('Error', err?.message || 'Could not add user.');
+      }
+    },
+    [group],
+  );
+
+  const nonMembers = useMemo(() => {
+    if (!group) return [];
+    const memberIds = new Set(group.members.map(m => m.id));
+    return allUsers.filter(u => {
+      if (memberIds.has(u.id) || u.id === currentUserId) return false;
+      if (!userSearch.trim()) return true;
+      return u.name.toLowerCase().includes(userSearch.toLowerCase());
+    });
+  }, [group, allUsers, currentUserId, userSearch]);
 
   const handleBack = useCallback(() => {
     navigation.goBack();
@@ -170,13 +214,6 @@ export function GroupDetailScreen() {
       Alert.alert('Error', 'Could not open the group chat.');
     }
   }, [group, navigation]);
-
-  const handleShareGroup = useCallback(() => {
-    if (!group) return;
-    Share.share({
-      message: `Join our group "${group.name}" on EPM4LIFE!`,
-    }).catch(console.error);
-  }, [group]);
 
   const handlePostToGroup = useCallback(async () => {
     const text = draft.trim();
@@ -340,6 +377,92 @@ export function GroupDetailScreen() {
         fontSize: FontSize.VALUE(14),
         paddingVertical: UtilityMethods.hp(4),
       },
+      addMemberBtn: {
+        backgroundColor: Colors.userProfilePurple,
+        borderRadius: UtilityMethods.wp(2.5),
+        paddingVertical: UtilityMethods.hp(1.3),
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: UtilityMethods.hp(1.5),
+      },
+      addMemberBtnText: {
+        color: Colors.white,
+        fontSize: FontSize.VALUE(14),
+        fontWeight: '700',
+      },
+      modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+      },
+      modalContainer: {
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: UtilityMethods.wp(5),
+        borderTopRightRadius: UtilityMethods.wp(5),
+        paddingHorizontal: H_PAD,
+        paddingTop: UtilityMethods.hp(2.5),
+        paddingBottom: UtilityMethods.hp(4),
+        maxHeight: '80%',
+      },
+      modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: UtilityMethods.hp(1.5),
+      },
+      modalTitle: {
+        fontSize: FontSize.VALUE(18),
+        fontWeight: '700',
+        color: Colors.textDark,
+      },
+      modalCloseText: {
+        fontSize: FontSize.VALUE(20),
+        color: Colors.textGrey,
+        padding: UtilityMethods.wp(1),
+      },
+      modalSearchInput: {
+        backgroundColor: Colors.inputBackground,
+        borderRadius: UtilityMethods.wp(2.5),
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(1.2),
+        fontSize: FontSize.VALUE(14),
+        color: Colors.textDark,
+        marginBottom: UtilityMethods.hp(1.5),
+      },
+      modalUserList: {
+        maxHeight: UtilityMethods.hp(45),
+      },
+      modalUserRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: UtilityMethods.hp(1.2),
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: Colors.borderGrey,
+      },
+      modalUserAvatar: {
+        width: UtilityMethods.wp(10),
+        height: UtilityMethods.wp(10),
+        borderRadius: UtilityMethods.wp(5),
+        backgroundColor: Colors.inputBackground,
+        marginRight: UtilityMethods.wp(3),
+      },
+      modalUserName: {
+        flex: 1,
+        fontSize: FontSize.VALUE(15),
+        fontWeight: '600',
+        color: Colors.textDark,
+      },
+      modalAddBtn: {
+        backgroundColor: Colors.userProfilePurple,
+        paddingHorizontal: UtilityMethods.wp(3.5),
+        paddingVertical: UtilityMethods.hp(0.8),
+        borderRadius: UtilityMethods.wp(5),
+      },
+      modalAddBtnText: {
+        color: Colors.white,
+        fontSize: FontSize.VALUE(12),
+        fontWeight: '700',
+      },
       missing: {
         flex: 1,
         padding: UtilityMethods.wp(5),
@@ -458,17 +581,6 @@ export function GroupDetailScreen() {
                 color={Colors.textDark}
               />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              onPress={handleShareGroup}
-              accessibilityRole="button"
-              accessibilityLabel="Share group"
-            >
-              <GroupShareIcon
-                width={UtilityMethods.wp(5)}
-                height={UtilityMethods.wp(5)}
-              />
-            </TouchableOpacity>
           </View>
 
           <UserProfileSegmentTabs
@@ -518,6 +630,15 @@ export function GroupDetailScreen() {
         )}
         {activeTab === 'members' && (
           <View style={styles.membersList}>
+            {group.ownerId === currentUserId && (
+              <TouchableOpacity
+                style={styles.addMemberBtn}
+                onPress={() => setAddModalVisible(true)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.addMemberBtnText}>+ Add Member</Text>
+              </TouchableOpacity>
+            )}
             {group.members.map(member => (
               <GroupMemberRow
                 key={member.id}
@@ -530,6 +651,64 @@ export function GroupDetailScreen() {
           </View>
         )}
       </View>
+
+      <Modal
+        visible={addModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAddModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Members to Group</Text>
+              <TouchableOpacity
+                onPress={() => setAddModalVisible(false)}
+                hitSlop={10}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalSearchInput}
+              placeholder="Search users..."
+              placeholderTextColor={Colors.placeholderGrey}
+              value={userSearch}
+              onChangeText={setUserSearch}
+            />
+            <ScrollView style={styles.modalUserList}>
+              {nonMembers.length > 0 ? (
+                nonMembers.map(u => (
+                  <View key={u.id} style={styles.modalUserRow}>
+                    <Image
+                      source={
+                        u.avatarUri
+                          ? { uri: u.avatarUri }
+                          : { uri: 'https://via.placeholder.com/100' }
+                      }
+                      style={styles.modalUserAvatar}
+                    />
+                    <Text style={styles.modalUserName} numberOfLines={1}>
+                      {u.name}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.modalAddBtn}
+                      onPress={() => handleAddUser(u)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.modalAddBtnText}>+ Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  {userSearch ? 'No matching users found.' : 'All registered users are already members.'}
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </MainLayout>
   );
 }

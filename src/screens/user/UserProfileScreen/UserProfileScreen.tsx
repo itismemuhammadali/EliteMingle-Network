@@ -21,7 +21,7 @@ import {
 import { useUserProfile } from '../../../components/user/UserProfileContext';
 import { useAppSelector } from '../../../redux/hooks';
 import { subscribeToFriends } from '../../../services/friendService';
-import { subscribeToPosts } from '../../../services/postService';
+import { subscribeToPosts, subscribeToSavedPosts } from '../../../services/postService';
 import { subscribeToUserGroups } from '../../../services/groupService';
 import { Colors } from '../../../constants/colors';
 import { initialsFromDisplayName } from '../../../utils/userProfileInitials';
@@ -35,11 +35,13 @@ import EditIcon from '../../../assets/Icons/profile/pencil.svg';
 import SettingIcon from '../../../assets/Icons/setting.svg';
 import MicIcon from '../../../assets/Icons/profile/microphone.svg';
 import SpeakerIcon from '../../../assets/Icons/profile/speaker.svg';
+import EmailIcon from '../../../assets/Icons/EmailIcon.svg';
 
 const H_PAD = UtilityMethods.wp(5);
 
 const DEFAULT_PROFILE_TABS: ProfileTabOption[] = [
   { key: 'posts', label: 'Posts' },
+  { key: 'saved', label: 'Saved' },
   { key: 'friends', label: 'Friends' },
   { key: 'groups', label: 'Groups' },
 ];
@@ -56,6 +58,7 @@ export function UserProfileScreen() {
   const [activeTab, setActiveTab] = useState('posts');
   const [friends, setFriends] = useState<UserFriendListItem[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [profileGroups, setProfileGroups] = useState<UserProfileGroupRow[]>([]);
 
   const currentUid = auth().currentUser?.uid || '';
@@ -82,7 +85,11 @@ export function UserProfileScreen() {
     const unsubscribe = subscribeToPosts(allPosts => {
       setMyPosts(allPosts.filter(p => p.authorUserId === currentUid && !p.groupId));
     });
-    return () => unsubscribe();
+    const unsubSaved = subscribeToSavedPosts(currentUid, setSavedPosts);
+    return () => {
+      unsubscribe();
+      unsubSaved();
+    };
   }, [currentUid]);
 
   useEffect(() => {
@@ -180,7 +187,20 @@ export function UserProfileScreen() {
         fontSize: FontSize.VALUE(14),
         lineHeight: FontSize.VALUE(21),
         color: Colors.textGrey,
-        marginBottom: UtilityMethods.hp(1.5),
+        marginBottom: UtilityMethods.hp(1),
+      },
+      contactDetails: {
+        marginBottom: UtilityMethods.hp(1.25),
+      },
+      contactRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: UtilityMethods.hp(0.4),
+      },
+      contactText: {
+        fontSize: FontSize.VALUE(13),
+        color: Colors.textDark,
+        marginLeft: UtilityMethods.wp(1.5),
       },
       badges: {
         flexDirection: 'row',
@@ -263,6 +283,21 @@ export function UserProfileScreen() {
           <Text style={styles.name}>{profile.displayName}</Text>
           <Text style={styles.bio}>{profile.bio}</Text>
 
+          <View style={styles.contactDetails}>
+            {profile.privacySettings?.showEmail && profile.email ? (
+              <View style={styles.contactRow}>
+                <EmailIcon width={UtilityMethods.wp(4)} height={UtilityMethods.wp(4)} fill={Colors.userProfilePurple} />
+                <Text style={styles.contactText}>{profile.email}</Text>
+              </View>
+            ) : null}
+            {profile.privacySettings?.showPhone && (profile.phone || (profile as any).phoneNumber) ? (
+              <View style={styles.contactRow}>
+                <Text style={{ fontSize: FontSize.VALUE(13) }}>📞</Text>
+                <Text style={styles.contactText}>{profile.phone || (profile as any).phoneNumber}</Text>
+              </View>
+            ) : null}
+          </View>
+
           {(isVoiceActive || isTtsActive) && (
             <View style={styles.badges}>
               {isVoiceActive && (
@@ -318,6 +353,16 @@ export function UserProfileScreen() {
           ) : (
             <Text style={styles.emptyPosts}>
               You haven't posted anything yet.
+            </Text>
+          ))}
+        {activeTab === 'saved' &&
+          (savedPosts.length > 0 ? (
+            savedPosts.map(post => (
+              <UserPostCard key={post.id} post={post} embedded />
+            ))
+          ) : (
+            <Text style={styles.emptyPosts}>
+              No saved posts yet. Tap Save on any post to view it here.
             </Text>
           ))}
         {activeTab === 'friends' && (

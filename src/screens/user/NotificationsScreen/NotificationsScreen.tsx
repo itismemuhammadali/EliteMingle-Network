@@ -75,6 +75,21 @@ export function NotificationsScreen() {
       markNotificationAsRead(item.id);
 
       if (item.type === 'message') {
+        const isGroup = !!item.groupId || (item.conversationId && item.conversationId.startsWith('group_'));
+        if (isGroup) {
+          const groupName = item.groupName || item.title.split(' in ')[1] || 'Group Chat';
+          const targetGroupId = item.groupId || item.conversationId?.replace(/^group_/, '') || '';
+          navigation.navigate('Chat', {
+            conversationId: item.conversationId,
+            peerId: targetGroupId,
+            peerName: groupName,
+            peerAvatarUri: '',
+            statusText: 'Group',
+            isOnlineStatus: false,
+          });
+          return;
+        }
+
         const peerName = item.title.replace(/^New message from\s*/i, '').trim() || 'User';
         navigation.navigate('Chat', {
           conversationId: item.conversationId,

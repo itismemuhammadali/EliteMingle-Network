@@ -413,6 +413,18 @@ export function OtherUserProfileScreen() {
         color: Colors.textGrey,
         marginBottom: UtilityMethods.hp(0.75),
       },
+      contactDetails: {
+        marginBottom: UtilityMethods.hp(0.75),
+      },
+      contactRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: UtilityMethods.hp(0.35),
+      },
+      contactText: {
+        fontSize: FontSize.VALUE(13),
+        color: Colors.textDark,
+      },
       mutual: {
         fontSize: FontSize.VALUE(13),
         fontWeight: '400',
@@ -517,6 +529,27 @@ export function OtherUserProfileScreen() {
         <View style={styles.body}>
           <Text style={styles.name}>{displayName}</Text>
           <Text style={styles.bio}>{bio}</Text>
+
+          {((profileData?.privacySettings?.showEmail && profileData?.email) ||
+            (profileData?.privacySettings?.showPhone &&
+              (profileData?.phone || profileData?.phoneNumber))) && (
+            <View style={styles.contactDetails}>
+              {profileData?.privacySettings?.showEmail && profileData?.email ? (
+                <View style={styles.contactRow}>
+                  <Text style={styles.contactText}>✉️ {profileData.email}</Text>
+                </View>
+              ) : null}
+              {profileData?.privacySettings?.showPhone &&
+              (profileData?.phone || profileData?.phoneNumber) ? (
+                <View style={styles.contactRow}>
+                  <Text style={styles.contactText}>
+                    📞 {profileData.phone || profileData.phoneNumber}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+
           <Text style={styles.mutual}>
             {friendsList.length} Friend{friendsList.length === 1 ? '' : 's'}
           </Text>

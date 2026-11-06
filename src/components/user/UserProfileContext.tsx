@@ -95,6 +95,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                   coverUri: data.coverUri !== undefined ? data.coverUri : prev.coverUri,
                   voiceCommandsEnabled: voiceVal,
                   ttsEnabled: ttsVal,
+                  privacySettings: data.privacySettings || prev.privacySettings || {},
                 }));
 
                 dispatch(

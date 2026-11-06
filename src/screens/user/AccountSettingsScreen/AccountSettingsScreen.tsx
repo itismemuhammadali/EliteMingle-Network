@@ -75,7 +75,6 @@ export function AccountSettingsScreen() {
   const { profile } = useUserProfile();
   const currentUserId = auth().currentUser?.uid || '';
 
-  const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(true);
   const [friendReqNotif, setFriendReqNotif] = useState(true);
   const [groupInvNotif, setGroupInvNotif] = useState(true);
@@ -84,7 +83,6 @@ export function AccountSettingsScreen() {
   useEffect(() => {
     if (!currentUserId) return;
     const unsubscribe = subscribeToNotificationSettings(currentUserId, s => {
-      if (s.email !== undefined) setEmailNotif(s.email);
       if (s.push !== undefined) setPushNotif(s.push);
       if (s.friendRequests !== undefined) setFriendReqNotif(s.friendRequests);
       if (s.groupInvites !== undefined) setGroupInvNotif(s.groupInvites);
@@ -101,13 +99,6 @@ export function AccountSettingsScreen() {
     [currentUserId],
   );
 
-  const toggleEmail = useCallback(
-    (v: boolean) => {
-      setEmailNotif(v);
-      persistNotif({ email: v });
-    },
-    [persistNotif],
-  );
   const togglePush = useCallback(
     (v: boolean) => {
       setPushNotif(v);
@@ -473,32 +464,26 @@ export function AccountSettingsScreen() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.soloCard}
+          activeOpacity={0.75}
+          onPress={() => {
+            navigation.navigate('UserMain');
+          }}
+        >
+          <View style={[styles.iconBox, { backgroundColor: '#EDE9FE' }]}>
+            <Text style={{ fontSize: UtilityMethods.wp(5) }}>🔖</Text>
+          </View>
+          <View style={styles.cardTextCol}>
+            <Text style={styles.cardTitle}>Saved Posts</Text>
+            <Text style={styles.cardSubtitle}>View posts you have saved</Text>
+          </View>
+        </TouchableOpacity>
+
         <Text style={[styles.sectionLabel, styles.sectionSpaced]}>
           Notifications
         </Text>
         <View style={styles.groupCard}>
-          <View style={styles.switchRow}>
-            <BellOutlineIcon
-              width={ICON_INNER}
-              height={ICON_INNER}
-              color={Colors.textDark}
-            />
-            <View style={styles.switchTextCol}>
-              <Text style={styles.cardTitle}>Email Notifications</Text>
-              <Text style={styles.cardSubtitle}>Receive updates via email</Text>
-            </View>
-            <Switch
-              value={emailNotif}
-              onValueChange={toggleEmail}
-              trackColor={{
-                false: '#E5E5E5',
-                true: Colors.userProfilePurple,
-              }}
-              thumbColor={Colors.white}
-              ios_backgroundColor="#E5E5E5"
-            />
-          </View>
-          <View style={styles.rowDivider} />
           <View style={styles.switchRow}>
             <BellOutlineIcon
               width={ICON_INNER}

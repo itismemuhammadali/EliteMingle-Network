@@ -631,3 +631,44 @@ export const savePost = async (
   }
 };
 
+/**
+ * Real-time subscription to the current user's saved posts.
+ */
+export const subscribeToSavedPosts = (
+  userId: string,
+  onUpdate: (posts: any[]) => void,
+) => {
+  if (!userId) {
+    onUpdate([]);
+    return () => {};
+  }
+  return firestore()
+    .collection('users')
+    .doc(userId)
+    .onSnapshot(async userSnap => {
+      if (!userSnap || !(typeof (userSnap as any).exists === 'function' ? userSnap.exists() : userSnap.exists)) {
+        onUpdate([]);
+        return;
+      }
+      const savedIds = (userSnap.data()?.savedPostIds as string[]) || [];
+      if (savedIds.length === 0) {
+        onUpdate([]);
+        return;
+      }
+      try {
+        const postSnaps = await Promise.all(
+          savedIds.map(id => firestore().collection('posts').doc(id).get()),
+        );
+        const validDocs = postSnaps.filter(s =>
+          typeof (s as any).exists === 'function' ? s.exists() : s.exists,
+        );
+        const mapped = validDocs.map(mapPostDoc);
+        const enriched = await enrichWithAuthorProfiles(mapped);
+        onUpdate(enriched);
+      } catch (err) {
+        console.error('Error loading saved posts:', err);
+        onUpdate([]);
+      }
+    });
+};
+

@@ -24,12 +24,17 @@ interface CreateNotificationParams {
   postId?: string;
   conversationId?: string;
   groupId?: string;
+  groupName?: string;
 }
 
 const docExists = (snap: any): boolean =>
   typeof snap?.exists === 'function' ? snap.exists() : !!snap?.exists;
 
-function buildTitle(type: UserAppNotificationType, actorName: string): string {
+function buildTitle(
+  type: UserAppNotificationType,
+  actorName: string,
+  groupName?: string,
+): string {
   switch (type) {
     case 'like':
       return `${actorName} liked your post`;
@@ -40,7 +45,9 @@ function buildTitle(type: UserAppNotificationType, actorName: string): string {
     case 'friend_accept':
       return `${actorName} accepted your friend request`;
     case 'message':
-      return `New message from ${actorName}`;
+      return groupName
+        ? `${actorName} sent a message in ${groupName}`
+        : `New message from ${actorName}`;
     default:
       return `${actorName} sent you a notification`;
   }
@@ -63,6 +70,7 @@ export const createNotification = async (
     postId = '',
     conversationId = '',
     groupId = '',
+    groupName = '',
   } = params;
   if (!recipientId || !actorId || recipientId === actorId) return;
 
@@ -95,11 +103,12 @@ export const createNotification = async (
       recipientId,
       actorId,
       type,
-      title: buildTitle(type, actorName),
+      title: buildTitle(type, actorName, groupName),
       subtitle: preview,
       postId,
       conversationId,
       groupId,
+      groupName: groupName || '',
       isRead: false,
       createdAt: firestore.FieldValue.serverTimestamp(),
     });
@@ -144,6 +153,7 @@ export const subscribeToNotifications = (
               postId: data.postId,
               conversationId: data.conversationId,
               groupId: data.groupId,
+              groupName: data.groupName,
             };
           })
           .sort((a, b) => {
