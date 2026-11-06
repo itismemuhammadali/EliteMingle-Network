@@ -24,6 +24,8 @@ export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.UserCredenti
     const response = await GoogleSignin.signIn();
 
     let idToken: string | null = null;
+    let accessToken: string | null = null;
+
     if (response && 'type' in response) {
       if (response.type === 'cancelled') {
         return null;
@@ -35,16 +37,26 @@ export const signInWithGoogle = async (): Promise<FirebaseAuthTypes.UserCredenti
       idToken = (response as any).idToken;
     }
 
-    if (!idToken) {
+    try {
       const tokens = await GoogleSignin.getTokens();
-      idToken = tokens.idToken;
+      if (!idToken && tokens.idToken) {
+        idToken = tokens.idToken;
+      }
+      if (tokens.accessToken) {
+        accessToken = tokens.accessToken;
+      }
+    } catch (tokenErr) {
+      console.warn('Failed to get additional Google tokens:', tokenErr);
     }
 
     if (!idToken) {
       throw new Error('Google Sign In failed: Unable to obtain ID token.');
     }
 
-    const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+    const googleCredential = auth.GoogleAuthProvider.credential(
+      idToken,
+      accessToken || undefined,
+    );
     const userCredential = await auth().signInWithCredential(googleCredential);
 
     if (userCredential.user) {
