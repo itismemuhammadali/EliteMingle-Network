@@ -179,7 +179,7 @@ export function ChatMessageContextMenu({
                 <Text style={styles.actionLabel}>Reply</Text>
               </TouchableOpacity>
 
-              {/* Delete for Everyone */}
+              {/* Delete */}
               {canDeleteForEveryone ? (
                 <>
                   <View style={styles.divider} />
@@ -195,7 +195,7 @@ export function ChatMessageContextMenu({
                       <TrashIcon width={20} height={20} color="#EF4444" />
                     </View>
                     <Text style={[styles.actionLabel, styles.actionLabelDestructive]}>
-                      Delete for Everyone
+                      Delete
                     </Text>
                   </TouchableOpacity>
                 </>

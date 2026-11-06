@@ -917,12 +917,12 @@ export function ChatScreen() {
   const handleDeleteForEveryone = useCallback(
     (msg: ChatMessage) => {
       Alert.alert(
-        'Delete for Everyone?',
-        'This message will be deleted for everyone in this chat.',
+        'Delete Message?',
+        'Are you sure you want to delete this message?',
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Delete for Everyone',
+            text: 'Delete',
             style: 'destructive',
             onPress: async () => {
               if (!activeConvId) return;
