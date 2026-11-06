@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import auth from '@react-native-firebase/auth';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import { NotificationIcon } from '../admin/icons';
 import HandycapIcon from '../../assets/Icons/handycap.svg';
+import { subscribeToUnreadCount } from '../../services/notificationService';
 
 const ICON = UtilityMethods.wp(5.5);
 
@@ -15,9 +17,22 @@ export interface UserProfileHeaderActionsProps {
 
 export function UserProfileHeaderActions({
   onBellPress,
-  hasNotificationBadge = true,
+  hasNotificationBadge,
   onAccessibilityPress,
 }: UserProfileHeaderActionsProps) {
+  const currentUserId = auth().currentUser?.uid || '';
+  const [dynamicBadge, setDynamicBadge] = useState(false);
+
+  useEffect(() => {
+    if (hasNotificationBadge !== undefined || !currentUserId) return;
+    const unsub = subscribeToUnreadCount(currentUserId, count => {
+      setDynamicBadge(count > 0);
+    });
+    return () => unsub();
+  }, [hasNotificationBadge, currentUserId]);
+
+  const showBadge =
+    hasNotificationBadge !== undefined ? hasNotificationBadge : dynamicBadge;
   return (
     <View style={styles.row}>
       <TouchableOpacity
@@ -31,7 +46,7 @@ export function UserProfileHeaderActions({
           size={UtilityMethods.wp(5.5)}
           color={Colors.adminInactiveGrey}
         />
-        {hasNotificationBadge && <View style={styles.badge} />}
+        {showBadge && <View style={styles.badge} />}
       </TouchableOpacity>
       <TouchableOpacity
         onPress={onAccessibilityPress}

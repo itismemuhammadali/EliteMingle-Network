@@ -522,6 +522,7 @@ export function OtherUserProfileScreen() {
           </Text>
 
           <UserPublicProfileActions
+            friendshipStatus={friendshipStatus}
             onFriendsPress={onFriendsPress}
             onMessagePress={openChat}
           />

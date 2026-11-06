@@ -406,3 +406,30 @@ export const leaveGroup = async (
     tx.update(ref, { members, memberCount: members.length });
   });
 };
+
+/** Transfer group admin rights to another member. */
+export const transferGroupAdmin = async (
+  groupId: string,
+  newAdminId: string,
+  currentUserId: string,
+): Promise<void> => {
+  if (!groupId || !newAdminId || !currentUserId) {
+    throw new Error('Group ID, new admin ID, and current user ID are required.');
+  }
+  const ref = firestore().collection('groups').doc(groupId);
+  const snap = await ref.get();
+  const exists = typeof (snap as any).exists === 'function' ? snap.exists() : snap.exists;
+  if (!exists) throw new Error('Group does not exist.');
+  const data = snap.data();
+  if (data?.ownerId !== currentUserId) {
+    throw new Error('Only the current group admin can transfer admin rights.');
+  }
+  const members = (data?.members as string[]) || [];
+  if (!members.includes(newAdminId)) {
+    throw new Error('The selected user must be a member of the group.');
+  }
+  await ref.update({
+    ownerId: newAdminId,
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  });
+};

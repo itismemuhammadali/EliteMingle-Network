@@ -8,15 +8,36 @@ import CommentOutlineIcon from '../../assets/Icons/profile/commentOutline.svg';
 
 const ICON = UtilityMethods.wp(4.75);
 
+export type FriendshipStatus =
+  | 'none'
+  | 'pending_outgoing'
+  | 'pending_incoming'
+  | 'friends';
+
 export interface UserPublicProfileActionsProps {
+  friendshipStatus?: FriendshipStatus;
   onFriendsPress?: () => void;
   onMessagePress?: () => void;
 }
 
 export function UserPublicProfileActions({
+  friendshipStatus = 'none',
   onFriendsPress,
   onMessagePress,
 }: UserPublicProfileActionsProps) {
+  const isRequested = friendshipStatus === 'pending_outgoing';
+  const isFriends = friendshipStatus === 'friends';
+  const isIncoming = friendshipStatus === 'pending_incoming';
+
+  let friendLabel = 'Add Friend';
+  if (isRequested) {
+    friendLabel = 'Requested';
+  } else if (isIncoming) {
+    friendLabel = 'Accept Request';
+  } else if (isFriends) {
+    friendLabel = 'Friends';
+  }
+
   const styles = useUserFontStyles(() =>
     StyleSheet.create({
       row: {
@@ -34,11 +55,19 @@ export function UserPublicProfileActions({
         paddingVertical: UtilityMethods.hp(1.5),
         marginRight: UtilityMethods.wp(2),
       },
+      friendsBtnRequested: {
+        backgroundColor: 'rgba(124, 58, 237, 0.1)',
+        borderWidth: 1.5,
+        borderColor: Colors.userProfilePurple,
+      },
       friendsLabel: {
         marginLeft: UtilityMethods.wp(2),
         fontSize: FontSize.VALUE(16),
         fontWeight: '700',
         color: Colors.white,
+      },
+      friendsLabelRequested: {
+        color: Colors.userProfilePurple,
       },
       messageBtn: {
         flex: 0.42,
@@ -63,14 +92,28 @@ export function UserPublicProfileActions({
   return (
     <View style={styles.row}>
       <TouchableOpacity
-        style={styles.friendsBtn}
+        style={[
+          styles.friendsBtn,
+          isRequested && styles.friendsBtnRequested,
+        ]}
         onPress={onFriendsPress}
         activeOpacity={0.88}
         accessibilityRole="button"
-        accessibilityLabel="Friends"
+        accessibilityLabel={friendLabel}
       >
-        <PersonPlusWhiteIcon width={ICON} height={ICON} color={Colors.white} />
-        <Text style={styles.friendsLabel}>Friends</Text>
+        <PersonPlusWhiteIcon
+          width={ICON}
+          height={ICON}
+          color={isRequested ? Colors.userProfilePurple : Colors.white}
+        />
+        <Text
+          style={[
+            styles.friendsLabel,
+            isRequested && styles.friendsLabelRequested,
+          ]}
+        >
+          {friendLabel}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.messageBtn}

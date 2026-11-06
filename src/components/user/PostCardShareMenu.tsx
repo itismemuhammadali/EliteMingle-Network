@@ -9,6 +9,7 @@ import {
   Linking,
   Alert,
   Clipboard,
+  Share,
 } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { Colors } from '../../constants/colors';
@@ -121,7 +122,7 @@ export function PostCardShareMenu({
   }, [postId]);
 
   const onWhatsApp = useCallback(() => {
-    const text = encodeURIComponent(url);
+    const text = encodeURIComponent(`Check out this post on EPM4LIFE: ${url}`);
     openOrAlert(
       `whatsapp://send?text=${text}`,
       'Install WhatsApp to share.',
@@ -131,14 +132,14 @@ export function PostCardShareMenu({
   }, [url, registerShare, onClose]);
 
   const onTwitter = useCallback(() => {
-    const text = encodeURIComponent(`Check out this post`);
+    const text = encodeURIComponent(`Check out this post on EPM4LIFE: ${url}`);
     openOrAlert(
       `https://twitter.com/intent/tweet?text=${text}&url=${encodedUrl}`,
       'Could not open Twitter.',
     );
     registerShare();
     onClose();
-  }, [encodedUrl, registerShare, onClose]);
+  }, [encodedUrl, url, registerShare, onClose]);
 
   const onFacebook = useCallback(() => {
     openOrAlert(
@@ -154,6 +155,20 @@ export function PostCardShareMenu({
     Alert.alert('Copied', 'Link copied to clipboard.');
     registerShare();
     onClose();
+  }, [url, registerShare, onClose]);
+
+  const onNativeShare = useCallback(async () => {
+    try {
+      await Share.share({
+        title: 'EPM4LIFE Post',
+        message: `Check out this post on EPM4LIFE: ${url}`,
+        url,
+      });
+      registerShare();
+      onClose();
+    } catch (err) {
+      console.error('Failed to share:', err);
+    }
   }, [url, registerShare, onClose]);
 
   const styles = useUserFontStyles(() =>
@@ -253,6 +268,16 @@ export function PostCardShareMenu({
           >
             <CopyGlyph size={iconSize} />
             <Text style={styles.rowLabel}>Copy Link</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.row}
+            onPress={onNativeShare}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.rowLabel, { marginLeft: UtilityMethods.wp(1), color: Colors.userProfilePurple, fontWeight: '600' }]}>
+              More Options...
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

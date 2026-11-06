@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import auth from '@react-native-firebase/auth';
 import { NotificationIcon } from '../admin/icons';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import { UserCenteredScreenHeader } from './UserCenteredScreenHeader';
 import HandycapIcon from '../../assets/Icons/handycap.svg';
+import { subscribeToUnreadCount } from '../../services/notificationService';
 
 export interface UserMessagesHeaderProps {
   /** Defaults to "Message" */
@@ -25,12 +27,25 @@ const AV = UtilityMethods.wp(9);
 
 export function UserMessagesHeader({
   title = 'Message',
-  hasNotificationBadge = true,
+  hasNotificationBadge,
   onBellPress,
   onAccessibilityPress,
   avatarUri,
   onAvatarPress,
 }: UserMessagesHeaderProps) {
+  const currentUserId = auth().currentUser?.uid || '';
+  const [dynamicBadge, setDynamicBadge] = useState(false);
+
+  useEffect(() => {
+    if (hasNotificationBadge !== undefined || !currentUserId) return;
+    const unsub = subscribeToUnreadCount(currentUserId, count => {
+      setDynamicBadge(count > 0);
+    });
+    return () => unsub();
+  }, [hasNotificationBadge, currentUserId]);
+
+  const showBadge =
+    hasNotificationBadge !== undefined ? hasNotificationBadge : dynamicBadge;
   const trailing = avatarUri ? (
     <TouchableOpacity
       onPress={onAvatarPress}
@@ -68,7 +83,7 @@ export function UserMessagesHeader({
           size={UtilityMethods.wp(5.5)}
           color={Colors.adminInactiveGrey}
         />
-        {hasNotificationBadge && <View style={styles.badge} />}
+        {showBadge && <View style={styles.badge} />}
       </TouchableOpacity>
       {trailing}
     </View>

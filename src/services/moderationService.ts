@@ -236,7 +236,7 @@ export const subscribeToAdminNotifications = (
 
 export interface ReportParams {
   reporterId: string;
-  targetType: 'post' | 'comment' | 'user';
+  targetType: 'post' | 'comment' | 'user' | 'group';
   targetId: string;
   /** The author/owner of the reported content, if known. */
   authorId?: string;

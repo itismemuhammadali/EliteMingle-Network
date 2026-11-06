@@ -208,18 +208,41 @@ export const getOrCreateGroupConversation = async (
 export const sendMessage = async ({
   conversationId,
   senderId,
+  senderName,
   text,
   mediaUrl,
   mediaType,
+  replyTo,
 }: {
   conversationId: string;
   senderId: string;
+  senderName?: string;
   text: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'audio';
+  replyTo?: {
+    id: string;
+    text: string;
+    senderName: string;
+    mediaType?: 'image' | 'audio';
+  };
 }): Promise<string> => {
   if (!conversationId || !senderId) {
     throw new Error('conversationId and senderId are required.');
+  }
+
+  // Resolve sender name if not explicitly passed
+  let resolvedSenderName = senderName;
+  if (!resolvedSenderName) {
+    try {
+      const userDoc = await firestore().collection('users').doc(senderId).get();
+      if (userDoc && (typeof (userDoc as any).exists === 'function' ? userDoc.exists() : userDoc.exists)) {
+        const uData = userDoc.data();
+        resolvedSenderName = uData?.fullName || uData?.displayName || uData?.name || '';
+      }
+    } catch {
+      // Non-blocking fallback
+    }
   }
 
   const msgRef = firestore()
@@ -235,9 +258,11 @@ export const sendMessage = async ({
     id: msgId,
     conversationId,
     senderId,
+    senderName: resolvedSenderName || 'Member',
     text: text.trim(),
     mediaUrl: mediaUrl || null,
     mediaType: mediaType || (mediaUrl ? 'image' : null),
+    replyTo: replyTo || null,
     createdAt: timestamp,
     readBy: [senderId],
   };
@@ -436,6 +461,8 @@ export const subscribeToConversations = (
     );
 };
 
+const userNameCache: Record<string, string> = {};
+
 /**
  * 5. Real-time subscription to messages within a specific conversation thread.
  */
@@ -455,14 +482,40 @@ export const subscribeToMessages = (
     .collection('messages')
     .orderBy('createdAt', 'asc')
     .onSnapshot(
-      snapshot => {
+      async snapshot => {
         if (!snapshot || snapshot.empty) {
           onUpdate([]);
           return;
         }
 
+        // Identify sender IDs needing name resolution
+        const missingIds = new Set<string>();
+        snapshot.docs.forEach(doc => {
+          const d = doc.data() as any;
+          if (!d.senderName && d.senderId && !userNameCache[d.senderId]) {
+            missingIds.add(d.senderId);
+          }
+        });
+
+        if (missingIds.size > 0) {
+          await Promise.all(
+            Array.from(missingIds).map(async uid => {
+              try {
+                const uDoc = await firestore().collection('users').doc(uid).get();
+                if (uDoc && (typeof (uDoc as any).exists === 'function' ? uDoc.exists() : uDoc.exists)) {
+                  const data = uDoc.data();
+                  const name = data?.fullName || data?.displayName || data?.name;
+                  userNameCache[uid] = (name && name !== 'Anonymous User') ? name : 'Member';
+                }
+              } catch {
+                userNameCache[uid] = 'Member';
+              }
+            }),
+          );
+        }
+
         const messagesList: ChatMessage[] = snapshot.docs.map(doc => {
-          const data = doc.data() as MessageDocument;
+          const data = doc.data() as any;
           let timeStr = '';
           if (data.createdAt) {
             const date = typeof (data.createdAt as any)?.toDate === 'function'
@@ -485,13 +538,21 @@ export const subscribeToMessages = (
                 : 'image'
               : undefined);
 
+          const senderName =
+            data.senderName ||
+            (data.senderId ? userNameCache[data.senderId] : undefined) ||
+            '';
+
           return {
             id: doc.id,
+            senderId: data.senderId,
+            senderName,
             text: data.text || '',
             time: timeStr,
             isOutgoing: data.senderId === currentUserId,
             mediaUrl: data.mediaUrl || undefined,
             mediaType,
+            replyTo: data.replyTo || undefined,
           };
         });
 

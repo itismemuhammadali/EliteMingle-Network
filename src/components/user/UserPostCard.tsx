@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import auth from '@react-native-firebase/auth';
 import {
   View,
@@ -7,12 +7,13 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Share,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Video from 'react-native-video';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { UserFeedPost } from '../../constants/userFeedData';
+import { getPostShareUrl, type UserFeedPost } from '../../constants/userFeedData';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../utility/FontSize';
@@ -32,6 +33,7 @@ import { useAppSelector } from '../../redux/hooks';
 import {
   toggleLike as toggleLikeService,
   subscribeToPostLike,
+  incrementShareCount,
 } from '../../services/postService';
 import type { UserStackParamList } from '../../navigation/User/types';
 
@@ -332,6 +334,20 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
     });
   };
 
+  const handleShare = useCallback(async () => {
+    const postUrl = getPostShareUrl(post.id);
+    try {
+      await Share.share({
+        title: 'EPM4LIFE Post',
+        message: `Check out this post on EPM4LIFE: ${postUrl}`,
+        url: postUrl,
+      });
+      incrementShareCount(post.id).catch(() => {});
+    } catch (err) {
+      console.error('Failed to share post:', err);
+    }
+  }, [post.id]);
+
   const simpIcon = UtilityMethods.wp(5);
 
   if (isHidden) {
@@ -482,7 +498,7 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
             <TouchableOpacity
               style={styles.simpBtn}
               activeOpacity={0.75}
-              onPress={() => setShareOpen(true)}
+              onPress={handleShare}
               accessibilityRole="button"
               accessibilityLabel="Share"
             >
@@ -519,7 +535,7 @@ function UserPostCardComponent({ post, embedded }: UserPostCardProps) {
             <TouchableOpacity
               style={styles.actionBtn}
               activeOpacity={0.7}
-              onPress={() => setShareOpen(true)}
+              onPress={handleShare}
             >
               <PostShare width={ACTION_ICON} height={ACTION_ICON} />
               <Text style={styles.actionText}>Share</Text>

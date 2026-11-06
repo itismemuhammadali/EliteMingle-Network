@@ -31,6 +31,7 @@ import {
   subscribeToGroupDetail,
   joinGroup,
   leaveGroup,
+  transferGroupAdmin,
   type GroupDetail,
 } from '../../../services/groupService';
 import {
@@ -93,6 +94,33 @@ export function GroupDetailScreen() {
       navigation.navigate('OtherUserProfile', { userId: member.id });
     },
     [navigation],
+  );
+
+  const handleMakeAdmin = useCallback(
+    (member: { id: string; name: string }) => {
+      if (!group || !currentUserId) return;
+      Alert.alert(
+        'Transfer Admin',
+        `Are you sure you want to make ${member.name} the group admin? You will no longer be the owner/admin.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Make Admin',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await transferGroupAdmin(group.id, member.id, currentUserId);
+                Alert.alert('Success', `${member.name} is now the group admin.`);
+              } catch (err: any) {
+                console.error('Failed to transfer admin:', err);
+                Alert.alert('Error', err?.message || 'Failed to transfer admin.');
+              }
+            },
+          },
+        ],
+      );
+    },
+    [group, currentUserId],
   );
 
   const handleToggleMembership = useCallback(() => {
@@ -495,6 +523,8 @@ export function GroupDetailScreen() {
                 key={member.id}
                 member={member}
                 onViewPress={onViewMember}
+                canMakeAdmin={group.ownerId === currentUserId && member.id !== currentUserId}
+                onMakeAdminPress={handleMakeAdmin}
               />
             ))}
           </View>
