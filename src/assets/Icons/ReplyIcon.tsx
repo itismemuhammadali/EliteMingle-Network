@@ -26,3 +26,4 @@ export function ReplyIcon({ size = 20, color = '#7C3AED' }: ReplyIconProps) {
     </Svg>
   );
 }
+

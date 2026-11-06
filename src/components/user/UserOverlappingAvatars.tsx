@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
+import { ProfileAvatar } from '../general/ProfileAvatar';
 
 export interface UserOverlappingAvatarsProps {
   uris: string[];
@@ -21,10 +22,20 @@ export function UserOverlappingAvatars({
 }: UserOverlappingAvatarsProps) {
   const s = UtilityMethods.wp(size);
   const ov = UtilityMethods.wp(overlap);
-  const display = uris.slice(0, 2);
+  const display = (uris || []).filter(Boolean).slice(0, 2);
+
+  if (display.length === 0) {
+    return <ProfileAvatar uri="" size={s} />;
+  }
+
+  if (display.length === 1) {
+    return <ProfileAvatar uri={display[0]} size={s} />;
+  }
+
+  const containerWidth = s + (display.length - 1) * (s - ov);
 
   return (
-    <View style={[styles.row, { width: s + s - ov }]}>
+    <View style={[styles.row, { width: containerWidth }]}>
       {display.map((uri, index) => (
         <Image
           key={`${uri}-${index}`}

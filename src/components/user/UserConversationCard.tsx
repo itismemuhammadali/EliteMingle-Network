@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import UtilityMethods from '../../utility/UtilityMethods';
@@ -55,23 +54,17 @@ export function UserConversationCard(props: UserConversationCardProps) {
         shadowRadius: 2,
         elevation: 1,
       },
-      avatar: {
-        width: AV,
-        height: AV,
-        borderRadius: AV / 2,
-        backgroundColor: Colors.inputBackground,
+      avatarMargin: {
+        marginRight: UtilityMethods.wp(3),
       },
       groupAvatars: {
         marginRight: UtilityMethods.wp(3),
       },
       middle: {
         flex: 1,
-        marginLeft: UtilityMethods.wp(3),
+        marginLeft: 0,
         marginRight: UtilityMethods.wp(2),
         minWidth: 0,
-      },
-      middleGroup: {
-        marginLeft: 0,
       },
       name: {
         fontSize: FontSize.VALUE(15),
@@ -114,16 +107,26 @@ export function UserConversationCard(props: UserConversationCardProps) {
 
   if (props.variant === 'group') {
     const { name, preview, memberLabel, avatarUris } = props;
+    const hasMultiple = avatarUris && avatarUris.length > 1;
+
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={onPress}
         activeOpacity={0.75}
       >
-        <View style={styles.groupAvatars}>
-          <UserOverlappingAvatars uris={avatarUris} />
-        </View>
-        <View style={[styles.middle, styles.middleGroup]}>
+        {hasMultiple ? (
+          <View style={styles.groupAvatars}>
+            <UserOverlappingAvatars uris={avatarUris} />
+          </View>
+        ) : (
+          <ProfileAvatar
+            uri={avatarUris && avatarUris[0] ? avatarUris[0] : ''}
+            size={AV}
+            style={styles.avatarMargin}
+          />
+        )}
+        <View style={styles.middle}>
           <Text style={styles.name} numberOfLines={1}>
             {name}
           </Text>
@@ -156,7 +159,11 @@ export function UserConversationCard(props: UserConversationCardProps) {
       onPress={onPress}
       activeOpacity={0.75}
     >
-      <ProfileAvatar uri={avatarUri} size={AV} style={{ marginRight: UtilityMethods.wp(3) }} />
+      <ProfileAvatar
+        uri={avatarUri}
+        size={AV}
+        style={styles.avatarMargin}
+      />
       <View style={styles.middle}>
         <Text style={styles.name} numberOfLines={1}>
           {name}
