@@ -242,16 +242,23 @@ export function ChatScreen() {
     if (memberIds.length === 0) return;
 
     const queryIds = memberIds.slice(0, 30);
-    firestore()
-      .collection('users')
-      .where(firestore.FieldPath.documentId(), 'in', queryIds)
-      .get()
-      .then(snap => {
+    Promise.all(
+      queryIds.map(id =>
+        firestore()
+          .collection('users')
+          .doc(id)
+          .get()
+          .catch(() => null),
+      ),
+    )
+      .then(docs => {
         const parts: MentionParticipant[] = [];
-        snap.docs.forEach(doc => {
-          if (doc.id === currentUserId) return;
+        docs.forEach(doc => {
+          if (!doc || !checkDocExists(doc) || doc.id === currentUserId) return;
           const d = doc.data();
-          const name = d.fullName || d.displayName || d.name || d.email?.split('@')[0] || 'User';
+          if (!d) return;
+          const name =
+            d.fullName || d.displayName || d.name || d.email?.split('@')[0] || 'User';
           const role =
             groupData?.ownerId === doc.id
               ? 'Owner'
