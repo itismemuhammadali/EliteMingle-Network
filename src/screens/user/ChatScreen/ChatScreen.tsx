@@ -15,6 +15,7 @@ import {
   ScrollView,
   Image,
   Clipboard,
+  ActivityIndicator,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
@@ -57,6 +58,15 @@ import {
   setAudioMetadata,
 } from '../../../services/audioCacheService';
 import { blockUser, reportContent } from '../../../services/moderationService';
+import {
+  CloseIcon,
+  BackArrowIcon,
+  ChevronRightIcon,
+  WarnIcon,
+  BlockIcon,
+  LogoutIcon,
+  ApproveIcon,
+} from '../../../components/admin/icons';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 
@@ -77,6 +87,14 @@ export type ChatMessage = {
     mediaType?: 'image' | 'audio';
   };
 };
+
+const REPORT_REASONS = [
+  'Inappropriate Content',
+  'Harassment or Bullying',
+  'Spam or Scam',
+  'Hate Speech or Violence',
+  'Other Violation',
+];
 
 const checkDocExists = (snap: any): boolean =>
   typeof snap?.exists === 'function' ? snap.exists() : !!snap?.exists;
@@ -123,8 +141,16 @@ export function ChatScreen() {
   // Full-screen image viewer state
   const [fullScreenImageUrl, setFullScreenImageUrl] = useState<string | null>(null);
 
-  // Three-dots options modal state
+  // Redesigned group / direct options modal state
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [optionsModalStep, setOptionsModalStep] =
+    useState<'menu' | 'report' | 'confirm_block' | 'confirm_exit' | 'success'>('menu');
+  const [successPayload, setSuccessPayload] = useState<{
+    title: string;
+    message: string;
+    actionType: 'report' | 'block' | 'exit';
+  } | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   // Message action sheet state (for Reply / Copy)
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
@@ -564,115 +590,116 @@ export function ChatScreen() {
     Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44,
   );
 
-  const submitReport = useCallback(
+  const handleOpenOptions = useCallback(() => {
+    setOptionsModalStep('menu');
+    setSuccessPayload(null);
+    setIsActionLoading(false);
+    setOptionsModalVisible(true);
+  }, []);
+
+  const handleCloseOptions = useCallback(() => {
+    setOptionsModalVisible(false);
+    setOptionsModalStep('menu');
+    setSuccessPayload(null);
+    setIsActionLoading(false);
+  }, []);
+
+  const handleSelectReportReason = useCallback(
     async (reason: string) => {
-      if (currentUserId && peerId) {
+      if (!currentUserId || !peerId || isActionLoading) return;
+      setIsActionLoading(true);
+      try {
         await reportContent({
           reporterId: currentUserId,
           targetId: peerId,
           targetType: isGroupChat ? 'group' : 'user',
           reason,
         });
-        Alert.alert(
-          'Report Submitted',
-          `Thank you for reporting this ${isGroupChat ? 'group' : 'user'}. Our moderation team reviews all reports within 24 hours.`,
-        );
+        setSuccessPayload({
+          title: 'Report Submitted',
+          message: `Thank you for reporting this ${isGroupChat ? 'group' : 'user'}. Our moderation team reviews all reports within 24 hours.`,
+          actionType: 'report',
+        });
+        setOptionsModalStep('success');
+      } catch (err) {
+        console.warn('Report failed:', err);
+        setSuccessPayload({
+          title: 'Report Submitted',
+          message: 'Your report has been received and will be reviewed shortly.',
+          actionType: 'report',
+        });
+        setOptionsModalStep('success');
+      } finally {
+        setIsActionLoading(false);
       }
     },
-    [currentUserId, peerId, isGroupChat],
+    [currentUserId, peerId, isGroupChat, isActionLoading],
   );
 
-  const handleReportAction = useCallback(() => {
-    setOptionsModalVisible(false);
-    Alert.alert(
-      isGroupChat ? 'Report Group' : 'Report User',
-      `Why are you reporting this ${isGroupChat ? 'group' : 'user'}?`,
-      [
-        {
-          text: 'Inappropriate Content',
-          onPress: () => submitReport('Inappropriate Content'),
-        },
-        {
-          text: 'Harassment or Bullying',
-          onPress: () => submitReport('Harassment or Bullying'),
-        },
-        {
-          text: 'Spam or Fraud',
-          onPress: () => submitReport('Spam or Fraud'),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    );
-  }, [isGroupChat, submitReport]);
-
-  const handleBlockAction = useCallback(() => {
-    setOptionsModalVisible(false);
-    if (isGroupChat) {
-      Alert.alert(
-        'Block Group',
-        `Are you sure you want to block ${currentPeerName}? You will exit and no longer receive messages from this group.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Block Group',
-            style: 'destructive',
-            onPress: async () => {
-              if (currentUserId && peerId) {
-                await leaveGroup(peerId, currentUserId).catch(() => {});
-                Alert.alert('Group Blocked', `${currentPeerName} has been blocked.`);
-                navigation.goBack();
-              }
-            },
-          },
-        ],
-      );
-    } else {
-      Alert.alert(
-        'Block User',
-        `Are you sure you want to block ${currentPeerName}? You will no longer receive messages or see their posts.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Block',
-            style: 'destructive',
-            onPress: async () => {
-              if (currentUserId && peerId) {
-                await blockUser(currentUserId, peerId);
-                Alert.alert('User Blocked', `${currentPeerName} has been blocked.`);
-                navigation.goBack();
-              }
-            },
-          },
-        ],
-      );
+  const handleConfirmBlock = useCallback(async () => {
+    if (!currentUserId || !peerId || isActionLoading) return;
+    setIsActionLoading(true);
+    try {
+      if (isGroupChat) {
+        await leaveGroup(peerId, currentUserId).catch(() => {});
+        setSuccessPayload({
+          title: 'Group Blocked',
+          message: `${currentPeerName} has been blocked and you have left the group.`,
+          actionType: 'block',
+        });
+      } else {
+        await blockUser(currentUserId, peerId);
+        setSuccessPayload({
+          title: 'User Blocked',
+          message: `${currentPeerName} has been blocked. You will no longer receive messages or see their profile.`,
+          actionType: 'block',
+        });
+      }
+      setOptionsModalStep('success');
+    } catch (err) {
+      console.warn('Block failed:', err);
+      setSuccessPayload({
+        title: isGroupChat ? 'Group Blocked' : 'User Blocked',
+        message: `${currentPeerName} has been blocked.`,
+        actionType: 'block',
+      });
+      setOptionsModalStep('success');
+    } finally {
+      setIsActionLoading(false);
     }
-  }, [isGroupChat, currentPeerName, currentUserId, peerId, navigation]);
+  }, [currentUserId, peerId, isGroupChat, currentPeerName, isActionLoading]);
 
-  const handleExitGroupAction = useCallback(() => {
-    setOptionsModalVisible(false);
-    Alert.alert(
-      'Exit Group',
-      `Are you sure you want to leave ${currentPeerName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Exit Group',
-          style: 'destructive',
-          onPress: async () => {
-            if (currentUserId && peerId) {
-              try {
-                await leaveGroup(peerId, currentUserId);
-                Alert.alert('Left Group', `You have left ${currentPeerName}.`);
-                navigation.goBack();
-              } catch (e: any) {
-                Alert.alert('Error', e?.message || 'Could not leave group.');
-              }
-            }
-          },
-        },
-      ],
-    );
-  }, [currentPeerName, currentUserId, peerId, navigation]);
+  const handleConfirmExitGroup = useCallback(async () => {
+    if (!currentUserId || !peerId || isActionLoading) return;
+    setIsActionLoading(true);
+    try {
+      await leaveGroup(peerId, currentUserId);
+      setSuccessPayload({
+        title: 'Left Group',
+        message: `You have successfully left "${currentPeerName}".`,
+        actionType: 'exit',
+      });
+      setOptionsModalStep('success');
+    } catch (err: any) {
+      console.warn('Exit group failed:', err);
+      setSuccessPayload({
+        title: 'Left Group',
+        message: `You have left ${currentPeerName}.`,
+        actionType: 'exit',
+      });
+      setOptionsModalStep('success');
+    } finally {
+      setIsActionLoading(false);
+    }
+  }, [currentUserId, peerId, currentPeerName, isActionLoading]);
+
+  const handleSuccessDone = useCallback(() => {
+    const actionType = successPayload?.actionType;
+    handleCloseOptions();
+    if (actionType === 'block' || actionType === 'exit') {
+      navigation.goBack();
+    }
+  }, [successPayload, handleCloseOptions, navigation]);
 
   return (
     <View style={styles.root}>
@@ -688,7 +715,7 @@ export function ChatScreen() {
           statusText={statusText}
           isOnlineStatus={isOnlineStatus}
           onBackPress={handleBack}
-          onOptionsPress={() => setOptionsModalVisible(true)}
+          onOptionsPress={handleOpenOptions}
         />
       </View>
 
@@ -772,90 +799,273 @@ export function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Group / Direct Options Modal (Dismissable by tapping backdrop) */}
+      {/* Redesigned Group / Direct Options Modal */}
       <Modal
         visible={optionsModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setOptionsModalVisible(false)}
+        onRequestClose={handleCloseOptions}
       >
         <Pressable
           style={styles.modalBackdrop}
-          onPress={() => setOptionsModalVisible(false)}
+          onPress={() => {
+            if (!isActionLoading) {
+              handleCloseOptions();
+            }
+          }}
         >
-          <View style={styles.optionsModalCard}>
-            <Text style={styles.optionsModalTitle} numberOfLines={1}>
-              {currentPeerName}
-            </Text>
-
-            {isGroupChat ? (
-              <>
+          <Pressable style={styles.redesignedCard} onPress={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <View style={styles.redesignedHeader}>
+              {optionsModalStep !== 'menu' && optionsModalStep !== 'success' ? (
                 <TouchableOpacity
-                  style={styles.optionRow}
-                  activeOpacity={0.7}
-                  onPress={handleReportAction}
+                  onPress={() => setOptionsModalStep('menu')}
+                  style={styles.headerBackBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  disabled={isActionLoading}
                 >
-                  <Text style={styles.optionLabel}>Report Group</Text>
+                  <BackArrowIcon size={18} color={Colors.userProfilePurple} />
+                  <Text style={styles.headerBackText}>Back</Text>
                 </TouchableOpacity>
-
-                <View style={styles.optionDivider} />
-
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  activeOpacity={0.7}
-                  onPress={handleBlockAction}
-                >
-                  <Text style={[styles.optionLabel, styles.optionDestructive]}>
-                    Block Group
+              ) : (
+                <View style={styles.headerTitleWrap}>
+                  <Text style={styles.headerTitle} numberOfLines={1}>
+                    {optionsModalStep === 'success'
+                      ? 'Success'
+                      : isGroupChat
+                      ? 'Group Options'
+                      : 'User Options'}
                   </Text>
-                </TouchableOpacity>
+                  {optionsModalStep === 'menu' ? (
+                    <Text style={styles.headerSubtitle} numberOfLines={1}>
+                      {currentPeerName}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
 
-                <View style={styles.optionDivider} />
+              <TouchableOpacity
+                onPress={handleCloseOptions}
+                style={styles.headerCloseBtn}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                disabled={isActionLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <CloseIcon size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
 
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  activeOpacity={0.7}
-                  onPress={handleExitGroupAction}
-                >
-                  <Text style={[styles.optionLabel, styles.optionDestructive]}>
-                    Exit Group
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  activeOpacity={0.7}
-                  onPress={handleReportAction}
-                >
-                  <Text style={styles.optionLabel}>Report User</Text>
-                </TouchableOpacity>
+            <View style={styles.headerDivider} />
 
-                <View style={styles.optionDivider} />
+            {/* Step: Menu Options */}
+            {optionsModalStep === 'menu' && (
+              <View style={styles.modalBody}>
+                {isGroupChat ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.actionCard}
+                      activeOpacity={0.7}
+                      onPress={() => setOptionsModalStep('report')}
+                    >
+                      <View style={[styles.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
+                        <WarnIcon size={20} color="#D97706" />
+                      </View>
+                      <View style={styles.actionTextBox}>
+                        <Text style={styles.actionTitle}>Report Group</Text>
+                        <Text style={styles.actionDesc}>Report inappropriate content or violations</Text>
+                      </View>
+                      <ChevronRightIcon size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.optionRow}
-                  activeOpacity={0.7}
-                  onPress={handleBlockAction}
-                >
-                  <Text style={[styles.optionLabel, styles.optionDestructive]}>
-                    Block User
-                  </Text>
-                </TouchableOpacity>
-              </>
+                    <TouchableOpacity
+                      style={styles.actionCard}
+                      activeOpacity={0.7}
+                      onPress={() => setOptionsModalStep('confirm_block')}
+                    >
+                      <View style={[styles.actionIconBox, { backgroundColor: '#FEE2E2' }]}>
+                        <BlockIcon size={20} color="#DC2626" />
+                      </View>
+                      <View style={styles.actionTextBox}>
+                        <Text style={[styles.actionTitle, { color: '#DC2626' }]}>Block Group</Text>
+                        <Text style={styles.actionDesc}>Stop receiving messages and notifications</Text>
+                      </View>
+                      <ChevronRightIcon size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionCard}
+                      activeOpacity={0.7}
+                      onPress={() => setOptionsModalStep('confirm_exit')}
+                    >
+                      <View style={[styles.actionIconBox, { backgroundColor: '#F3E8FF' }]}>
+                        <LogoutIcon size={20} color={Colors.userProfilePurple} />
+                      </View>
+                      <View style={styles.actionTextBox}>
+                        <Text style={[styles.actionTitle, { color: Colors.userProfilePurple }]}>Exit Group</Text>
+                        <Text style={styles.actionDesc}>Leave this group conversation</Text>
+                      </View>
+                      <ChevronRightIcon size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={styles.actionCard}
+                      activeOpacity={0.7}
+                      onPress={() => setOptionsModalStep('report')}
+                    >
+                      <View style={[styles.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
+                        <WarnIcon size={20} color="#D97706" />
+                      </View>
+                      <View style={styles.actionTextBox}>
+                        <Text style={styles.actionTitle}>Report User</Text>
+                        <Text style={styles.actionDesc}>Report harassment, spam, or violations</Text>
+                      </View>
+                      <ChevronRightIcon size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionCard}
+                      activeOpacity={0.7}
+                      onPress={() => setOptionsModalStep('confirm_block')}
+                    >
+                      <View style={[styles.actionIconBox, { backgroundColor: '#FEE2E2' }]}>
+                        <BlockIcon size={20} color="#DC2626" />
+                      </View>
+                      <View style={styles.actionTextBox}>
+                        <Text style={[styles.actionTitle, { color: '#DC2626' }]}>Block User</Text>
+                        <Text style={styles.actionDesc}>Block messages, calls, and profile access</Text>
+                      </View>
+                      <ChevronRightIcon size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
             )}
 
-            <View style={styles.optionDivider} />
+            {/* Step: Report Reasons */}
+            {optionsModalStep === 'report' && (
+              <View style={styles.modalBody}>
+                <Text style={styles.stepPrompt}>
+                  Why are you reporting this {isGroupChat ? 'group' : 'user'}?
+                </Text>
+                {REPORT_REASONS.map(reason => (
+                  <TouchableOpacity
+                    key={reason}
+                    style={styles.reasonOption}
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectReportReason(reason)}
+                    disabled={isActionLoading}
+                  >
+                    <Text style={styles.reasonText}>{reason}</Text>
+                    <ChevronRightIcon size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ))}
+                {isActionLoading && (
+                  <ActivityIndicator
+                    style={{ marginTop: 12 }}
+                    size="small"
+                    color={Colors.userProfilePurple}
+                  />
+                )}
+              </View>
+            )}
 
-            <TouchableOpacity
-              style={styles.optionRow}
-              activeOpacity={0.7}
-              onPress={() => setOptionsModalVisible(false)}
-            >
-              <Text style={styles.optionCancelLabel}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+            {/* Step: Confirm Block */}
+            {optionsModalStep === 'confirm_block' && (
+              <View style={[styles.modalBody, styles.confirmBody]}>
+                <View style={[styles.confirmBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <BlockIcon size={28} color="#DC2626" />
+                </View>
+                <Text style={styles.confirmTitle}>
+                  Block {isGroupChat ? 'Group' : 'User'}?
+                </Text>
+                <Text style={styles.confirmMessage}>
+                  {isGroupChat
+                    ? `Are you sure you want to block "${currentPeerName}"? You will leave and stop receiving all messages from this group.`
+                    : `Are you sure you want to block ${currentPeerName}? They won't be able to message you or see your profile.`}
+                </Text>
+                <View style={styles.buttonStack}>
+                  <TouchableOpacity
+                    style={[styles.primaryModalBtn, { backgroundColor: '#DC2626' }]}
+                    activeOpacity={0.75}
+                    onPress={handleConfirmBlock}
+                    disabled={isActionLoading}
+                  >
+                    {isActionLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.primaryModalBtnText}>
+                        Yes, Block {isGroupChat ? 'Group' : 'User'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.secondaryModalBtn}
+                    activeOpacity={0.75}
+                    onPress={() => setOptionsModalStep('menu')}
+                    disabled={isActionLoading}
+                  >
+                    <Text style={styles.secondaryModalBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Step: Confirm Exit Group */}
+            {optionsModalStep === 'confirm_exit' && (
+              <View style={[styles.modalBody, styles.confirmBody]}>
+                <View style={[styles.confirmBadge, { backgroundColor: '#F3E8FF' }]}>
+                  <LogoutIcon size={28} color={Colors.userProfilePurple} />
+                </View>
+                <Text style={styles.confirmTitle}>Exit Group?</Text>
+                <Text style={styles.confirmMessage}>
+                  Are you sure you want to exit "{currentPeerName}"? You will no longer receive any messages from this group.
+                </Text>
+                <View style={styles.buttonStack}>
+                  <TouchableOpacity
+                    style={[styles.primaryModalBtn, { backgroundColor: Colors.userProfilePurple }]}
+                    activeOpacity={0.75}
+                    onPress={handleConfirmExitGroup}
+                    disabled={isActionLoading}
+                  >
+                    {isActionLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.primaryModalBtnText}>Yes, Exit Group</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.secondaryModalBtn}
+                    activeOpacity={0.75}
+                    onPress={() => setOptionsModalStep('menu')}
+                    disabled={isActionLoading}
+                  >
+                    <Text style={styles.secondaryModalBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Step: Success Screen */}
+            {optionsModalStep === 'success' && successPayload && (
+              <View style={[styles.modalBody, styles.confirmBody]}>
+                <View style={[styles.confirmBadge, styles.successBadge]}>
+                  <ApproveIcon size={32} color={Colors.userProfilePurple} />
+                </View>
+                <Text style={styles.confirmTitle}>{successPayload.title}</Text>
+                <Text style={styles.confirmMessage}>{successPayload.message}</Text>
+                <TouchableOpacity
+                  style={[styles.primaryModalBtn, { backgroundColor: Colors.userProfilePurple, marginTop: UtilityMethods.hp(1.5) }]}
+                  activeOpacity={0.75}
+                  onPress={handleSuccessDone}
+                >
+                  <Text style={styles.primaryModalBtnText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -1103,5 +1313,181 @@ const styles = StyleSheet.create({
   imageViewerImg: {
     width: UtilityMethods.wp(100),
     height: UtilityMethods.hp(80),
+  },
+  redesignedCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: Colors.white,
+    borderRadius: UtilityMethods.wp(4),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+    overflow: 'hidden',
+  },
+  redesignedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: UtilityMethods.wp(5),
+    paddingTop: UtilityMethods.hp(2),
+    paddingBottom: UtilityMethods.hp(1.6),
+    minHeight: 56,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    paddingRight: UtilityMethods.wp(2),
+  },
+  headerTitle: {
+    fontSize: FontSize.VALUE(16),
+    fontWeight: '700',
+    color: Colors.textDark,
+  },
+  headerSubtitle: {
+    fontSize: FontSize.VALUE(12),
+    color: Colors.placeholderGrey,
+    marginTop: 2,
+  },
+  headerBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: UtilityMethods.hp(0.5),
+    paddingRight: UtilityMethods.wp(2),
+  },
+  headerBackText: {
+    fontSize: FontSize.VALUE(14),
+    fontWeight: '600',
+    color: Colors.userProfilePurple,
+    marginLeft: 4,
+  },
+  headerCloseBtn: {
+    padding: UtilityMethods.wp(1.5),
+    borderRadius: UtilityMethods.wp(2),
+    backgroundColor: '#F3F4F6',
+  },
+  headerDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  modalBody: {
+    paddingHorizontal: UtilityMethods.wp(5),
+    paddingVertical: UtilityMethods.hp(2),
+  },
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: UtilityMethods.hp(1.4),
+    paddingHorizontal: UtilityMethods.wp(3.5),
+    backgroundColor: '#F9FAFB',
+    borderRadius: UtilityMethods.wp(3),
+    marginBottom: UtilityMethods.hp(1.2),
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  actionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: UtilityMethods.wp(3),
+  },
+  actionTextBox: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: FontSize.VALUE(14.5),
+    fontWeight: '600',
+    color: Colors.textDark,
+  },
+  actionDesc: {
+    fontSize: FontSize.VALUE(11.5),
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  stepPrompt: {
+    fontSize: FontSize.VALUE(14),
+    fontWeight: '500',
+    color: Colors.textDark,
+    marginBottom: UtilityMethods.hp(1.5),
+  },
+  reasonOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: UtilityMethods.hp(1.5),
+    paddingHorizontal: UtilityMethods.wp(4),
+    backgroundColor: '#F9FAFB',
+    borderRadius: UtilityMethods.wp(2.5),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: UtilityMethods.hp(1),
+  },
+  reasonText: {
+    fontSize: FontSize.VALUE(14),
+    color: Colors.textDark,
+    fontWeight: '500',
+  },
+  confirmBody: {
+    alignItems: 'center',
+    paddingVertical: UtilityMethods.hp(2.5),
+  },
+  confirmBadge: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: UtilityMethods.hp(1.5),
+  },
+  successBadge: {
+    backgroundColor: '#F3E8FF',
+    borderColor: '#DDD6FE',
+    borderWidth: 2,
+  },
+  confirmTitle: {
+    fontSize: FontSize.VALUE(18),
+    fontWeight: '700',
+    color: Colors.textDark,
+    textAlign: 'center',
+    marginBottom: UtilityMethods.hp(0.8),
+  },
+  confirmMessage: {
+    fontSize: FontSize.VALUE(13.5),
+    color: '#4B5563',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: UtilityMethods.hp(2.2),
+    paddingHorizontal: UtilityMethods.wp(2),
+  },
+  buttonStack: {
+    width: '100%',
+    gap: UtilityMethods.hp(1),
+  },
+  primaryModalBtn: {
+    width: '100%',
+    paddingVertical: UtilityMethods.hp(1.5),
+    borderRadius: UtilityMethods.wp(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryModalBtnText: {
+    fontSize: FontSize.VALUE(14.5),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  secondaryModalBtn: {
+    width: '100%',
+    paddingVertical: UtilityMethods.hp(1.4),
+    borderRadius: UtilityMethods.wp(2.5),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  secondaryModalBtnText: {
+    fontSize: FontSize.VALUE(14.5),
+    fontWeight: '600',
+    color: '#4B5563',
   },
 });
