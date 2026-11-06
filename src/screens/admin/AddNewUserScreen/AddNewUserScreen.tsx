@@ -19,7 +19,7 @@ import {
   AddUserProfilePhotoPicker,
   AddUserPendingNote,
 } from '../../../components/admin';
-import { UserPlusIcon } from '../../../components/admin/icons';
+import { UserPlusIcon, EyeIcon, EyeOffIcon } from '../../../components/admin/icons';
 import { uploadAvatar } from '../../../services/postService';
 import { createUserAccount } from '../../../services/adminUserService';
 import auth from '@react-native-firebase/auth';
@@ -274,20 +274,39 @@ function LabeledInput({
   autoCapitalize?: 'none' | 'sentences';
   secureTextEntry?: boolean;
 }) {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        style={[styles.input, error ? styles.inputError : null]}
-        placeholder={placeholder}
-        placeholderTextColor={Colors.placeholderGrey}
-        value={value}
-        onChangeText={onChangeText}
-        onBlur={onBlur}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize ?? 'sentences'}
-        secureTextEntry={secureTextEntry}
-      />
+      <View style={[styles.inputRowContainer, error ? styles.inputError : null]}>
+        <TextInput
+          style={styles.inputInner}
+          placeholder={placeholder}
+          placeholderTextColor={Colors.placeholderGrey}
+          value={value}
+          onChangeText={onChangeText}
+          onBlur={onBlur}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize ?? 'sentences'}
+          secureTextEntry={secureTextEntry && !isPasswordVisible}
+        />
+        {secureTextEntry ? (
+          <TouchableOpacity
+            style={styles.eyeButton}
+            onPress={() => setIsPasswordVisible(v => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+          >
+            {isPasswordVisible ? (
+              <EyeOffIcon size={UtilityMethods.wp(5)} color="rgba(16, 16, 16, 0.6)" />
+            ) : (
+              <EyeIcon size={UtilityMethods.wp(5)} color="rgba(16, 16, 16, 0.6)" />
+            )}
+          </TouchableOpacity>
+        ) : null}
+      </View>
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
@@ -385,7 +404,7 @@ const styles = StyleSheet.create({
     color: Colors.textDark,
     marginBottom: UtilityMethods.hp(0.75),
   },
-  input: {
+  inputContainer: {
     borderWidth: 1,
     borderColor: Colors.borderGrey,
     borderRadius: UtilityMethods.wp(2),
@@ -394,6 +413,27 @@ const styles = StyleSheet.create({
     paddingVertical: UtilityMethods.hp(1.5),
     fontSize: FontSize.VALUE(15),
     color: Colors.textDark,
+  },
+  inputRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderGrey,
+    borderRadius: UtilityMethods.wp(2),
+    backgroundColor: Colors.inputBackground,
+  },
+  inputInner: {
+    flex: 1,
+    paddingHorizontal: UtilityMethods.wp(4),
+    paddingVertical: UtilityMethods.hp(1.5),
+    fontSize: FontSize.VALUE(15),
+    color: Colors.textDark,
+  },
+  eyeButton: {
+    paddingHorizontal: UtilityMethods.wp(3.5),
+    paddingVertical: UtilityMethods.hp(1.2),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputError: {
     borderColor: Colors.adminErrorRed,

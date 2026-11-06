@@ -25,7 +25,6 @@ import MainLayout from '../../../components/general/MainLayout';
 import Logo from '../../../assets/svgs/logo.svg';
 import EmailIcon from '../../../assets/svgs/EmailIcon.svg';
 import PasswordIcon from '../../../assets/svgs/PasswordIcon.svg';
-import EyeIcon from '../../../assets/svgs/EyeIcon.svg';
 import CheckmarkIcon from '../../../assets/svgs/Checkmark.svg';
 import PersonIcon from '../../../assets/svgs/PersonIcon.svg';
 import ButtonArrow from '../../../assets/Icons/ButtonArrow.svg';
@@ -168,7 +167,6 @@ export function SignUpScreen() {
                   label="Password"
                   placeholder="Create a password"
                   leftIcon={<PasswordIcon />}
-                  rightIcon={<EyeIcon />}
                   secureTextEntry
                   value={values.password}
                   onChangeText={handleChange('password')}
@@ -182,7 +180,6 @@ export function SignUpScreen() {
                   label="Confirm Password"
                   placeholder="Confirm your password"
                   leftIcon={<PasswordIcon />}
-                  rightIcon={<EyeIcon />}
                   secureTextEntry
                   value={values.confirmPassword}
                   onChangeText={handleChange('confirmPassword')}

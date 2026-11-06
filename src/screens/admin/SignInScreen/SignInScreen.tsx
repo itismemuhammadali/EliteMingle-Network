@@ -22,7 +22,6 @@ import DescriptionText from '../../../components/general/descriptionText/Descrip
 import Logo from '../../../assets/svgs/logo.svg';
 import EmailIcon from '../../../assets/svgs/EmailIcon.svg';
 import PasswordIcon from '../../../assets/svgs/PasswordIcon.svg';
-import EyeIcon from '../../../assets/svgs/EyeIcon.svg';
 import PeopleIconSelected from '../../../assets/Icons/peopleblue.svg';
 import PeopleIconDefault from '../../../assets/Icons/people.svg';
 import Card from '../../../components/general/Card/Card';
@@ -206,7 +205,6 @@ export function SignInScreen() {
                 placeholder="Enter your password"
                 leftIconName="lock-outline"
                 secureTextEntry
-                rightIcon={<EyeIcon />}
                 leftIcon={<PasswordIcon />}
                 value={values.password}
                 onChangeText={handleChange('password')}

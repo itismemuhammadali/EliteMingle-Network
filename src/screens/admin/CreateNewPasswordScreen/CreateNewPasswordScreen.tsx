@@ -3,7 +3,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Formik } from 'formik';
 import Logo from '../../../assets/svgs/logo.svg';
 import PasswordIcon from '../../../assets/svgs/PasswordIcon.svg';
-import EyeIcon from '../../../assets/svgs/EyeIcon.svg';
 import { TitleText, Button, TextInputField } from '../../../components/general';
 import DescriptionText from '../../../components/general/descriptionText/DescriptionText';
 import Card from '../../../components/general/Card/Card';
@@ -62,7 +61,6 @@ export function CreateNewPasswordScreen() {
                   leftIconName="lock-outline"
                   placeholder="Create a password"
                   secureTextEntry
-                  rightIcon={<EyeIcon />}
                   value={values.password}
                   onChangeText={handleChange('password')}
                   onBlur={handleBlur('password')}
@@ -79,7 +77,6 @@ export function CreateNewPasswordScreen() {
                   leftIconName="lock-outline"
                   placeholder="Confirm your password"
                   secureTextEntry
-                  rightIcon={<EyeIcon />}
                   value={values.confirmPassword}
                   onChangeText={handleChange('confirmPassword')}
                   onBlur={handleBlur('confirmPassword')}

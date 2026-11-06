@@ -10,6 +10,7 @@ import {
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize from '../../../utility/FontSize';
 import { Colors } from '../../../constants/colors';
+import { EyeIcon, EyeOffIcon } from '../../admin/icons';
 
 interface TextInputFieldProps extends TextInputProps {
   label: string;
@@ -41,23 +42,32 @@ export function TextInputField({
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.inputContainer, showError && styles.inputError]}>
-        <View style={styles.iconLeft}>{leftIcon}</View>
+        {leftIcon ? <View style={styles.iconLeft}>{leftIcon}</View> : null}
 
         <TextInput
-          style={[styles.input, leftIconName && styles.inputWithIcon, style]}
+          style={[styles.input, leftIcon && styles.inputWithIcon, style]}
           placeholder={placeholder}
           placeholderTextColor={Colors.placeholderGrey}
           secureTextEntry={secureTextEntry && !isPasswordVisible}
           {...textInputProps}
         />
-        {secureTextEntry && (
+        {secureTextEntry ? (
           <TouchableOpacity
             style={styles.eyeButton}
-            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            onPress={() => setIsPasswordVisible(v => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
           >
-            {rightIcon}
+            {isPasswordVisible ? (
+              <EyeOffIcon size={UtilityMethods.wp(5.25)} color="rgba(16, 16, 16, 0.6)" />
+            ) : (
+              <EyeIcon size={UtilityMethods.wp(5.25)} color="rgba(16, 16, 16, 0.6)" />
+            )}
           </TouchableOpacity>
-        )}
+        ) : rightIcon ? (
+          <View style={styles.eyeButton}>{rightIcon}</View>
+        ) : null}
       </View>
       {showError && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -97,7 +107,10 @@ const styles = StyleSheet.create({
     paddingLeft: UtilityMethods.wp(3),
   },
   eyeButton: {
-    padding: UtilityMethods.wp(2),
+    paddingHorizontal: UtilityMethods.wp(3),
+    paddingVertical: UtilityMethods.hp(1),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   eyeIcon: {
     fontSize: FontSize.BODY_TEXT,
