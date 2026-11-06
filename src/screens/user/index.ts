@@ -16,3 +16,4 @@ export { EditProfileScreen } from './EditProfileScreen';
 export { OtherUserProfileScreen } from './OtherUserProfileScreen';
 export { GroupDetailScreen } from './GroupDetailScreen';
 export { FindFriendsScreen } from './FindFriendsScreen';
+export { SavedPostsScreen } from './SavedPostsScreen';

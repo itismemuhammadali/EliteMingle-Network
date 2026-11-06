@@ -14,6 +14,7 @@ import { OtherUserProfileScreen } from '../../screens/user/OtherUserProfileScree
 import { NotificationsScreen } from '../../screens/user/NotificationsScreen';
 import { PostCommentsScreen } from '../../screens/user/PostCommentsScreen';
 import { FindFriendsScreen } from '../../screens/user/FindFriendsScreen';
+import { SavedPostsScreen } from '../../screens/user/SavedPostsScreen';
 import { LegalDocumentScreen } from '../../screens/common/LegalDocumentScreen';
 import type { UserStackParamList } from './types';
 
@@ -43,6 +44,7 @@ export function UserStack() {
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="PostComments" component={PostCommentsScreen} />
         <Stack.Screen name="FindFriends" component={FindFriendsScreen} />
+        <Stack.Screen name="SavedPosts" component={SavedPostsScreen} />
         <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
       </Stack.Navigator>
     </UserProfileProvider>

@@ -87,9 +87,9 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
                 setProfileState(prev => ({
                   ...prev,
                   displayName: data.fullName || firebaseUser.displayName || prev.displayName,
-                  email: data.email || firebaseUser.email || prev.email,
+                  email: data.email || data.emailAddress || firebaseUser.email || prev.email,
                   bio: data.bio !== undefined ? data.bio : prev.bio,
-                  phone: data.phone !== undefined ? data.phone : prev.phone,
+                  phone: data.phone || data.phoneNumber || firebaseUser.phoneNumber || prev.phone,
                   location: data.location !== undefined ? data.location : prev.location,
                   avatarUri: data.avatarUri || data.profilePicture || firebaseUser.photoURL || prev.avatarUri || null,
                   coverUri: data.coverUri !== undefined ? data.coverUri : prev.coverUri,

@@ -18,6 +18,7 @@ import type { UserStackParamList } from '../../../navigation/User/types';
 import MainLayout from '../../../components/general/MainLayout';
 import ArrowLeftIcon from '../../../assets/Icons/arrowLeft.svg';
 import { Colors } from '../../../constants/colors';
+import { useUserProfile } from '../../../components/user';
 import UtilityMethods from '../../../utility/UtilityMethods';
 import FontSize, { useUserFontStyles } from '../../../utility/FontSize';
 import ShieldIcon from '../../../assets/Icons/profile/accountSettings/shield.svg';
@@ -39,6 +40,7 @@ const SWITCH_TRACK = {
 export function PrivacySettingsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
+  const { profile, updateProfile } = useUserProfile();
   const currentUserId = auth().currentUser?.uid || '';
 
   const [publicProfile, setPublicProfile] = useState(true);
@@ -95,9 +97,77 @@ export function PrivacySettingsScreen() {
     [currentUserId],
   );
 
+  const handleToggle = useCallback(
+    (key: string, val: boolean) => {
+      // 1. Update local state
+      switch (key) {
+        case 'publicProfile': setPublicProfile(val); break;
+        case 'showEmail': setShowEmail(val); break;
+        case 'showPhone': setShowPhone(val); break;
+        case 'showLocation': setShowLocation(val); break;
+        case 'friendRequests': setFriendRequests(val); break;
+        case 'messages': setMessages(val); break;
+        case 'onlineStatus': setOnlineStatus(val); break;
+        case 'allowTagging': setAllowTagging(val); break;
+        case 'commentsOnPosts': setCommentsOnPosts(val); break;
+      }
+
+      // 2. Immediately update in-memory context
+      updateProfile({
+        privacySettings: {
+          ...(profile.privacySettings || {}),
+          [key]: val,
+        },
+      });
+
+      // 3. Immediately persist to Firestore
+      if (currentUserId) {
+        firestore()
+          .collection('users')
+          .doc(currentUserId)
+          .set(
+            {
+              privacySettings: {
+                [key]: val,
+              },
+            },
+            { merge: true },
+          )
+          .catch(err => console.error(`Error saving ${key}:`, err));
+      }
+    },
+    [currentUserId, profile.privacySettings, updateProfile],
+  );
+
   const handleBack = useCallback(() => {
+    if (currentUserId) {
+      saveSettings({
+        publicProfile,
+        showEmail,
+        showPhone,
+        showLocation,
+        friendRequests,
+        messages,
+        onlineStatus,
+        allowTagging,
+        commentsOnPosts,
+      }).catch(() => {});
+    }
     navigation.goBack();
-  }, [navigation]);
+  }, [
+    currentUserId,
+    saveSettings,
+    publicProfile,
+    showEmail,
+    showPhone,
+    showLocation,
+    friendRequests,
+    messages,
+    onlineStatus,
+    allowTagging,
+    commentsOnPosts,
+    navigation,
+  ]);
 
   const onSave = useCallback(async () => {
     if (!currentUserId) return;
@@ -400,7 +470,7 @@ export function PrivacySettingsScreen() {
             title="Public Profile"
             subtitle="Anyone can view your profile"
             value={publicProfile}
-            onValueChange={setPublicProfile}
+            onValueChange={v => handleToggle('publicProfile', v)}
             showDivider
           />
           <PrivacySwitchRow
@@ -408,7 +478,7 @@ export function PrivacySettingsScreen() {
             title="Show Email Address"
             subtitle="Display email on your profile"
             value={showEmail}
-            onValueChange={setShowEmail}
+            onValueChange={v => handleToggle('showEmail', v)}
             showDivider
           />
           <PrivacySwitchRow
@@ -416,7 +486,7 @@ export function PrivacySettingsScreen() {
             title="Show Phone Number"
             subtitle="Display phone on your profile"
             value={showPhone}
-            onValueChange={setShowPhone}
+            onValueChange={v => handleToggle('showPhone', v)}
             showDivider
           />
           <PrivacySwitchRow
@@ -424,7 +494,7 @@ export function PrivacySettingsScreen() {
             title="Show Location"
             subtitle="Display your location"
             value={showLocation}
-            onValueChange={setShowLocation}
+            onValueChange={v => handleToggle('showLocation', v)}
             showDivider={false}
           />
         </View>
@@ -438,7 +508,7 @@ export function PrivacySettingsScreen() {
             title="Friend Requests"
             subtitle="Allow others to send friend requests"
             value={friendRequests}
-            onValueChange={setFriendRequests}
+            onValueChange={v => handleToggle('friendRequests', v)}
             showDivider
           />
           <PrivacySwitchRow
@@ -446,7 +516,7 @@ export function PrivacySettingsScreen() {
             title="Messages"
             subtitle="Allow others to message you"
             value={messages}
-            onValueChange={setMessages}
+            onValueChange={v => handleToggle('messages', v)}
             showDivider
           />
           <PrivacySwitchRow
@@ -454,7 +524,7 @@ export function PrivacySettingsScreen() {
             title="Online Status"
             subtitle={"Show when you're online"}
             value={onlineStatus}
-            onValueChange={setOnlineStatus}
+            onValueChange={v => handleToggle('onlineStatus', v)}
             showDivider={false}
           />
         </View>
@@ -468,7 +538,7 @@ export function PrivacySettingsScreen() {
             title="Allow Tagging"
             subtitle="Others can tag you in posts"
             value={allowTagging}
-            onValueChange={setAllowTagging}
+            onValueChange={v => handleToggle('allowTagging', v)}
             showDivider
           />
           <PrivacySwitchRow
@@ -476,7 +546,7 @@ export function PrivacySettingsScreen() {
             title="Comments on Posts"
             subtitle="Allow comments on your posts"
             value={commentsOnPosts}
-            onValueChange={setCommentsOnPosts}
+            onValueChange={v => handleToggle('commentsOnPosts', v)}
             showDivider={false}
           />
         </View>

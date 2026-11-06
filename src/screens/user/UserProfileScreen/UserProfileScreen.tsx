@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { UserStackParamList } from '../../../navigation/User/types';
 import MainLayout from '../../../components/general/MainLayout';
@@ -49,7 +50,7 @@ const DEFAULT_PROFILE_TABS: ProfileTabOption[] = [
 export function UserProfileScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<UserStackParamList>>();
-  const { profile } = useUserProfile();
+  const { profile, updateProfile } = useUserProfile();
   const { openAccessibilityModal } = useAccessibilityModal();
   const reduxTts = useAppSelector(s => s.ttsEnabled);
   const reduxVoice = useAppSelector(s => s.voiceCommandsEnabled);
@@ -60,8 +61,51 @@ export function UserProfileScreen() {
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
   const [profileGroups, setProfileGroups] = useState<UserProfileGroupRow[]>([]);
+  const [liveUserDoc, setLiveUserDoc] = useState<any>(null);
 
   const currentUid = auth().currentUser?.uid || '';
+
+  // Real-time listener for current user's profile and privacy settings
+  useEffect(() => {
+    if (!currentUid) return;
+    const unsub = firestore()
+      .collection('users')
+      .doc(currentUid)
+      .onSnapshot(
+        doc => {
+          if (doc && (typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists)) {
+            const data = doc.data() || {};
+            setLiveUserDoc(data);
+            if (data.privacySettings) {
+              updateProfile({ privacySettings: data.privacySettings });
+            }
+          }
+        },
+        err => console.warn('UserProfile user doc snapshot error:', err),
+      );
+    return () => unsub();
+  }, [currentUid, updateProfile]);
+
+  // Re-sync on focus whenever returning to Profile screen
+  useFocusEffect(
+    useCallback(() => {
+      if (!currentUid) return;
+      firestore()
+        .collection('users')
+        .doc(currentUid)
+        .get()
+        .then(doc => {
+          if (doc && (typeof (doc as any).exists === 'function' ? doc.exists() : doc.exists)) {
+            const data = doc.data() || {};
+            setLiveUserDoc(data);
+            if (data.privacySettings) {
+              updateProfile({ privacySettings: data.privacySettings });
+            }
+          }
+        })
+        .catch(err => console.warn('UserProfile focus fetch error:', err));
+    }, [currentUid, updateProfile]),
+  );
 
   // The groups this user belongs to (real data).
   useEffect(() => {
@@ -280,20 +324,26 @@ export function UserProfileScreen() {
         />
 
         <View style={styles.body}>
-          <Text style={styles.name}>{profile.displayName}</Text>
-          <Text style={styles.bio}>{profile.bio}</Text>
+          <Text style={styles.name}>{liveUserDoc?.fullName || profile.displayName}</Text>
+          <Text style={styles.bio}>{liveUserDoc?.bio !== undefined ? liveUserDoc.bio : profile.bio}</Text>
 
           <View style={styles.contactDetails}>
-            {profile.privacySettings?.showEmail && profile.email ? (
+            {(profile.privacySettings?.showEmail ?? liveUserDoc?.privacySettings?.showEmail) &&
+            (liveUserDoc?.email || liveUserDoc?.emailAddress || profile.email || auth().currentUser?.email) ? (
               <View style={styles.contactRow}>
                 <EmailIcon width={UtilityMethods.wp(4)} height={UtilityMethods.wp(4)} fill={Colors.userProfilePurple} />
-                <Text style={styles.contactText}>{profile.email}</Text>
+                <Text style={styles.contactText}>
+                  {liveUserDoc?.email || liveUserDoc?.emailAddress || profile.email || auth().currentUser?.email}
+                </Text>
               </View>
             ) : null}
-            {profile.privacySettings?.showPhone && (profile.phone || (profile as any).phoneNumber) ? (
+            {(profile.privacySettings?.showPhone ?? liveUserDoc?.privacySettings?.showPhone) &&
+            (liveUserDoc?.phone || liveUserDoc?.phoneNumber || profile.phone || (profile as any)?.phoneNumber) ? (
               <View style={styles.contactRow}>
                 <Text style={{ fontSize: FontSize.VALUE(13) }}>📞</Text>
-                <Text style={styles.contactText}>{profile.phone || (profile as any).phoneNumber}</Text>
+                <Text style={styles.contactText}>
+                  {liveUserDoc?.phone || liveUserDoc?.phoneNumber || profile.phone || (profile as any)?.phoneNumber}
+                </Text>
               </View>
             ) : null}
           </View>

@@ -468,7 +468,7 @@ export function AccountSettingsScreen() {
           style={styles.soloCard}
           activeOpacity={0.75}
           onPress={() => {
-            navigation.navigate('UserMain');
+            navigation.navigate('SavedPosts');
           }}
         >
           <View style={[styles.iconBox, { backgroundColor: '#EDE9FE' }]}>

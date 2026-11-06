@@ -31,5 +31,6 @@ export type UserStackParamList = {
     authorName: string;
   };
   FindFriends: undefined;
+  SavedPosts: undefined;
   LegalDocument?: { documentType?: 'terms' | 'privacy' | 'eula' };
 };
