@@ -351,3 +351,4 @@ export function InAppNotificationToast() {
     </Animated.View>
   );
 }
+

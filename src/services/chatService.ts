@@ -278,6 +278,28 @@ export const sendMessage = async ({
   const msgId = msgRef.id;
   const timestamp = firestore.FieldValue.serverTimestamp();
 
+  let cleanedReplyTo: {
+    id: string;
+    text: string;
+    senderName: string;
+    mediaType?: 'image' | 'audio' | null;
+  } | null = null;
+
+  if (replyTo && (replyTo.id || replyTo.text)) {
+    let snippet = (replyTo.text || '').trim();
+    if (!snippet) {
+      if (replyTo.mediaType === 'image') snippet = '📷 Photo';
+      else if (replyTo.mediaType === 'audio') snippet = '🎤 Voice memo';
+      else snippet = 'Message';
+    }
+    cleanedReplyTo = {
+      id: String(replyTo.id || `reply-${Date.now()}`),
+      text: String(snippet),
+      senderName: String(replyTo.senderName || 'Member'),
+      mediaType: replyTo.mediaType || null,
+    };
+  }
+
   const messageData = {
     id: msgId,
     conversationId,
@@ -286,7 +308,7 @@ export const sendMessage = async ({
     text: text.trim(),
     mediaUrl: mediaUrl || null,
     mediaType: mediaType || (mediaUrl ? 'image' : null),
-    replyTo: replyTo || null,
+    replyTo: cleanedReplyTo,
     postShare: postShare || null,
     createdAt: timestamp,
     readBy: [senderId],
@@ -645,7 +667,14 @@ export const subscribeToMessages = (
             isOutgoing: data.senderId === currentUserId,
             mediaUrl: data.mediaUrl || undefined,
             mediaType,
-            replyTo: data.replyTo || undefined,
+            replyTo: data.replyTo
+              ? {
+                  id: data.replyTo.id || '',
+                  text: data.replyTo.text || '',
+                  senderName: data.replyTo.senderName || 'Member',
+                  mediaType: data.replyTo.mediaType || undefined,
+                }
+              : undefined,
             postShare: postShare || undefined,
           };
         });

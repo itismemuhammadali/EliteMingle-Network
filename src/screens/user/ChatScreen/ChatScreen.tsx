@@ -375,13 +375,22 @@ export function ChatScreen() {
 
   const buildReplyPayload = useCallback(() => {
     if (!replyingTo) return undefined;
+    let snippet = (replyingTo.text || '').trim();
+    if (!snippet) {
+      if (replyingTo.mediaType === 'image') snippet = '📷 Photo';
+      else if (replyingTo.mediaType === 'audio') snippet = '🎤 Voice memo';
+      else snippet = 'Message';
+    }
+
+    const sender = replyingTo.isOutgoing
+      ? 'You'
+      : (replyingTo.senderName || currentPeerName || 'Member');
+
     return {
-      id: replyingTo.id,
-      text: replyingTo.text,
-      senderName: replyingTo.isOutgoing
-        ? 'You'
-        : (replyingTo.senderName || currentPeerName),
-      mediaType: replyingTo.mediaType,
+      id: String(replyingTo.id || `msg-${Date.now()}`),
+      text: String(snippet),
+      senderName: String(sender),
+      mediaType: replyingTo.mediaType || undefined,
     };
   }, [replyingTo, currentPeerName]);
 
@@ -394,6 +403,7 @@ export function ChatScreen() {
     }
 
     const replyData = buildReplyPayload();
+    const prevReplyingTo = replyingTo;
     setDraft('');
     setReplyingTo(null);
 
@@ -423,8 +433,11 @@ export function ChatScreen() {
           text: t,
           replyTo: replyData,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error sending message:', err);
+        setDraft(t);
+        if (prevReplyingTo) setReplyingTo(prevReplyingTo);
+        Alert.alert('Send Error', err?.message || 'Could not send message. Please try again.');
       }
     } else {
       const msg: ChatMessage = {
@@ -436,7 +449,18 @@ export function ChatScreen() {
       };
       setMessages(prev => [...prev, msg]);
     }
-  }, [draft, activeConvId, currentUserId, peerId, currentPeerName, currentPeerAvatar, buildReplyPayload]);
+  }, [
+    draft,
+    activeConvId,
+    currentUserId,
+    peerId,
+    normalizedGroupId,
+    isGroupChat,
+    currentPeerName,
+    currentPeerAvatar,
+    buildReplyPayload,
+    replyingTo,
+  ]);
 
   const handleAttach = useCallback(() => {
     if (!currentUserId) {

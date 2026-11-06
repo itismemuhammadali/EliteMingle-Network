@@ -305,6 +305,39 @@ function MessageBubbleComponent({
       >
         {isVoiceMemo && (formattedMediaUrl || mediaUrl) ? (
           <View style={styles.audioWrap}>
+            {replyTo ? (
+              <View
+                style={[
+                  styles.replyQuoteBox,
+                  isOutgoing ? styles.replyQuoteBoxOut : styles.replyQuoteBoxIn,
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[
+                      styles.replyQuoteSender,
+                      isOutgoing ? styles.replyQuoteSenderOut : styles.replyQuoteSenderIn,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {replyTo.senderName || 'Replied Message'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.replyQuoteText,
+                      isOutgoing ? styles.replyQuoteTextOut : styles.replyQuoteTextIn,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {replyTo.mediaType === 'image'
+                      ? '📷 Photo'
+                      : replyTo.mediaType === 'audio'
+                      ? '🎤 Voice memo'
+                      : replyTo.text}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <VoiceMemoPlayer audioUri={formattedMediaUrl || mediaUrl!} showDelete={false} />
           </View>
         ) : showText || postShare || (isPhoto && imageSource && !imgError) ? (
@@ -473,7 +506,8 @@ export const MessageBubble = React.memo(
       prevProps.senderName === nextProps.senderName &&
       prevProps.showSenderName === nextProps.showSenderName &&
       prevProps.postShare?.postId === nextProps.postShare?.postId &&
-      prevProps.replyTo?.id === nextProps.replyTo?.id
+      prevProps.replyTo?.id === nextProps.replyTo?.id &&
+      prevProps.replyTo?.text === nextProps.replyTo?.text
     );
   },
 );
