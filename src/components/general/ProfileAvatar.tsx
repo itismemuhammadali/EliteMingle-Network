@@ -16,7 +16,7 @@ export interface ProfileAvatarProps {
  * Reusable Avatar component:
  * Renders the user's remote/local photo if valid.
  * When absent or empty, displays the official bottom navigation UserTabProfileIcon SVG.
- * Never falls back to hardcoded pravatar images.
+ * Always respects the outer `style` (margins, layout) regardless of image presence.
  */
 export function ProfileAvatar({
   uri,
@@ -34,23 +34,6 @@ export function ProfileAvatar({
       uri.startsWith('file://') ||
       uri.startsWith('content://'));
 
-  if (hasValidUri) {
-    return (
-      <Image
-        source={{ uri }}
-        style={[
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-          },
-          imageStyle,
-        ]}
-        resizeMode="cover"
-      />
-    );
-  }
-
   return (
     <View
       style={[
@@ -66,7 +49,22 @@ export function ProfileAvatar({
         style,
       ]}
     >
-      <UserTabProfileIcon size={Math.round(size * 0.55)} color={iconColor} />
+      {hasValidUri ? (
+        <Image
+          source={{ uri }}
+          style={[
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+            },
+            imageStyle,
+          ]}
+          resizeMode="cover"
+        />
+      ) : (
+        <UserTabProfileIcon size={Math.round(size * 0.55)} color={iconColor} />
+      )}
     </View>
   );
 }

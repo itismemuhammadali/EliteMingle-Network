@@ -55,10 +55,10 @@ export function UserConversationCard(props: UserConversationCardProps) {
         elevation: 1,
       },
       avatarMargin: {
-        marginRight: UtilityMethods.wp(3),
+        marginRight: UtilityMethods.wp(4.5),
       },
       groupAvatars: {
-        marginRight: UtilityMethods.wp(3),
+        marginRight: UtilityMethods.wp(4.5),
       },
       middle: {
         flex: 1,
